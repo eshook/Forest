@@ -145,6 +145,11 @@ class ShapefileReadPrim(Primitive):
         vector.sr = spatialReference
         vector.setLayer(newlayer)
         return vector
+
+    def reg(self, filename):
+        print(self.name,"register")
+        self.filename = filename
+        return self
         
 ShapefileRead = ShapefileReadPrim()   
 
@@ -161,19 +166,25 @@ class ShapefileNewReadPrim(Primitive):
         
     def __call__(self, filename = None):    
         
+        if filename is not None:
+            self.filename = filename
+        
         crs = None
         features = []
-        with fiona.collection(filename) as shp:
+        with fiona.collection(self.filename) as shp:
             print("Boundingbox",shp.bounds)
             for feature in shp:
                 features.append(feature)
-        
-        print("features0",features[0])
                 
         vector = Vector()
         vector.data = features
         return vector
-
+    
+    def reg(self, filename):
+        print(self.name,"register")
+        self.filename = filename
+        return self
+    
 ShapefileNewRead = ShapefileNewReadPrim()
         
 
@@ -185,10 +196,14 @@ class GeotiffReadPrim(Primitive):
         # Set passthrough to True so that data is passed through
         self.passthrough = True
         
-        
-    def __call__(self, filename = None, bandnumber = 1):
     
-        ds = gdal.Open(filename) # Open gdal dataset
+    # FIXME: inbob is temporary for now, to solve a passthrough issue. Need to fix.
+    def __call__(self, inbob = None, filename = None, bandnumber = 1):
+
+        if filename is not None:
+            self.filename = filename        
+
+        ds = gdal.Open(self.filename) # Open gdal dataset
         if ds is None:
             raise PCMLException("Cannot open "+filename+" in ReadGeoTIFF")
     
@@ -230,6 +245,10 @@ class GeotiffReadPrim(Primitive):
     
         return layer
 
-
+    def reg(self, filename):
+        print(self.name,"register")
+        self.filename = filename
+        return self
+    
 GeotiffRead = GeotiffReadPrim()    
     
