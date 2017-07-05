@@ -5,12 +5,14 @@ Use of this source code is governed by a BSD-style license that can be found in 
 @contributors: (Jacob Arndt, arndt204@umn.edu; )
 """
 
+# TODO CHANGE BACK
+'''
 # FIXME: We need to have conditional imports here eventually
 from collections import OrderedDict
 from osgeo import ogr,gdal
 import json
 import fiona
-
+'''
 
 from .Primitive import *
 from ..bobs.Bobs import *

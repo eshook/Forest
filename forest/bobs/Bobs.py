@@ -38,6 +38,9 @@ class Raster(Bob):
         # Create a zero raster array
         self.data = np.zeros((self.nrows,self.ncols))
 
+    def get_data(self, r, c, rh, cw):
+        return self.data[r:r+rh,c:c+cw]
+        
         
 # Vector Layer Bob
 class Vector(Bob):        

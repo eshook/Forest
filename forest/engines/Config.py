@@ -5,7 +5,6 @@ Use of this source code is governed by a BSD-style license that can be found in 
 @contributors: <Contribute and add your name here!>
 """
 
-
 # This is a global variable that allows the outputs from one interop 
 # to be passed as 'inputs' to the next interop
 inputs = []
@@ -16,5 +15,5 @@ flows = {}
 
 # This is a global variable that enables users and developers
 # to control which computational engine is used
-# When set to none, the pattern operators (< > !=) do nothing.
+# When set to pass_engine, the pattern operators (< > !=) do nothing.
 engine = None

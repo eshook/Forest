@@ -28,56 +28,22 @@ class Primitive(object):
     
     def __eq__(self, right):
         print(self, "== (Sequence)", right)
-        run_primitive(self)
+        Config.engine.run(self)
         return right
 
     def __gt__(self, right):
         print(self, "> (Merge)", right)
-        run_primitive(self)
+        Config.engine.run(self)
+        Config.engine.merge(Config.inputs)
         return right
 
     def __lt__(self, right):
-        print(self, "< (Split)", right)
-        run_primitive(self)
+        print(self, "< (Split)", right)        
+        Config.engine.run(self)
+        Config.engine.split(Config.inputs)
         return right
 
-        
-# This method will run a single primitive operation
-# It will pull data from inputs and run the primitive
-# It will save the input
+# This function exposes the engine's run to the outside world.
 def run_primitive(op):
-    #global inputs  # Grab the global inputs variable
-    inputs = Config.inputs
-
-    # Uncomment for debug statements
-    #print("run_primitive inputs", inputs)
-    #print("op(inputs)", op,"(",inputs,")")
+    return Config.engine.run(op)
     
-    # Get the name of the primitive operation being executed
-    name = op.__class__.__name__
-
-    # Save the flows information in the global config data structure
-    # FIXME: The problem with this solution is all data will be stored
-    #        indefinitely, which is going to be a huge problem.
-    Config.flows[name] = {}
-    Config.flows[name]['input'] = inputs
-    
-    if isinstance(inputs,Bob): # If it is a bob
-        inputs = op(inputs)    # Just pass in the bob
-    else:                      # If it is a list
-        #print("inputs=", inputs)
-        inputs = op(*inputs)   # De-reference the list and pass as parameters
-
-    # Save the outputs from this primitive
-    Config.flows[name]['output'] = inputs
-    
-    # Uncomment to see debug information with 'flows'
-    #print("flows",Config.flows)
-    
-    # Save inputs from this primitive, for the next primtive/pattern
-    if op.passthrough is False: # Typical case
-        Config.inputs = inputs # Reset the inputs
-    else:
-        Config.inputs.append(inputs) # Add to the inputs
-        
-    return inputs

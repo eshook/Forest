@@ -3,6 +3,9 @@ from forest.bobs.Bobs import *
 
 import forest.engines.Config
 
+# Debugger line
+#import pdb; pdb.set_trace()
+
 def testit_randomstuff():
     # Make an empty Bob
     b = Bob()
@@ -51,7 +54,7 @@ def testit_oldschool(zonefilename, datafilename):
     
 def zonalaverage_forest(zonefilename, datafilename):
 
-    output = run_primitive( VectorZoneTest.reg(zonefilename) == RasterDataTest.reg(datafilename) < PartialSum > Average )
+    output = run_primitive( VectorZoneTest.reg(zonefilename) == RasterDataTest.reg(datafilename) < PartialSum > AggregateSum == Average )
 
     return output
     
@@ -73,6 +76,6 @@ zonefilename = "examples/data/vector.shp"
 datafilename = "examples/data/raster.tif"
 
     
-testit_oldschool(zonefilename,datafilename)
+#testit_oldschool(zonefilename,datafilename)
 
 testit_forest(zonefilename,datafilename)

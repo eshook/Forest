@@ -46,6 +46,51 @@ class PartialSumPrim(Primitive):
 
 PartialSum = PartialSumPrim()
 
+class AggregateSumPrim(Primitive):
+    def __init__(self):
+
+        # Call the __init__ for Primitive  
+        super(AggregateSumPrim,self).__init__("AggregateSum")
+
+    def __call__(self, *args):
+        
+        # Since it is an aggregator/reducer it takes in a list of bobs
+        boblist = args
+        
+        # Set default values for miny,maxy,minx,maxx using first entry
+        miny = maxy = boblist[0].y
+        minx = maxx = boblist[0].x
+        
+        # Loop over bobs to find maximum spatial extent
+        for bob in boblist:
+            # Find miny,maxy,minx,maxx
+            miny = min(miny,bob.y)
+            maxy = max(maxy,bob.y)
+            minx = min(minx,bob.x)
+            maxx = max(maxx,bob.x)
+        
+        # Create the key_value output Bob that (spatially) spans all input bobs
+        out_kv = KeyValue(miny, minx, maxy-miny, maxx-minx)
+
+        # Set data to be an empty dictionary
+        out_kv.data = {}
+        
+        # Loop over bobs, get keys and sum the values and counts
+        for bob in boblist:
+            # Loop over keys
+            for key in bob.data:
+                
+                if key in out_kv.data:
+                    out_kv.data[key]['val']+=bob.data[key]['val']
+                    out_kv.data[key]['cnt']+=bob.data[key]['cnt']
+                else:
+                    out_kv.data[key] = {} # Create the entry and set val/cnt
+                    out_kv.data[key]['val']=bob.data[key]['val']
+                    out_kv.data[key]['cnt']=bob.data[key]['cnt']
+            
+        return out_kv
+
+AggregateSum = AggregateSumPrim()
 
 
 class AveragePrim(Primitive):
