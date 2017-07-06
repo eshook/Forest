@@ -6,6 +6,7 @@ import forest.engines.Config
 # Debugger line
 #import pdb; pdb.set_trace()
 
+
 def testit_randomstuff():
     # Make an empty Bob
     b = Bob()
@@ -72,10 +73,13 @@ def testit_forest(zonefilename, datafilename):
     print("finished forest")
 
 
-zonefilename = "examples/data/vector.shp"
-datafilename = "examples/data/raster.tif"
-
     
-#testit_oldschool(zonefilename,datafilename)
-
-testit_forest(zonefilename,datafilename)
+if __name__ == '__main__':
+    
+    zonefilename = "examples/data/vector.shp"
+    datafilename = "examples/data/raster.tif"
+    
+        
+    #testit_oldschool(zonefilename,datafilename)
+    
+    testit_forest(zonefilename,datafilename)

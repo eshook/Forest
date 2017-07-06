@@ -5,14 +5,11 @@ Use of this source code is governed by a BSD-style license that can be found in 
 @contributors: (Jacob Arndt, arndt204@umn.edu; )
 """
 
-# TODO CHANGE BACK
-'''
 # FIXME: We need to have conditional imports here eventually
 from collections import OrderedDict
 from osgeo import ogr,gdal
 import json
 import fiona
-'''
 
 from .Primitive import *
 from ..bobs.Bobs import *
@@ -173,12 +170,17 @@ class ShapefileNewReadPrim(Primitive):
         
         crs = None
         features = []
+        y = x = h = w = 0.0
         with fiona.collection(self.filename) as shp:
             print("Boundingbox",shp.bounds)
             for feature in shp:
                 features.append(feature)
+            y = shp.bounds[0]
+            x = shp.bounds[1]
+            h = shp.bounds[2] - y
+            w = shp.bounds[3] - x
                 
-        vector = Vector()
+        vector = Vector(y, x, h, w)
         vector.data = features
         return vector
     
@@ -213,7 +215,8 @@ class GeotiffReadPrim(Primitive):
         band = ds.GetRasterBand(bandnumber)
         ncols = ds.RasterXSize
         nrows = ds.RasterYSize
-    
+
+        
         if band is None:
             print("Cannot read selected band in "+filename+" in ReadGeoTIFF")
             raise(Exception)

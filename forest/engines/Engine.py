@@ -9,10 +9,13 @@ from ..bobs.Bob import *
 from ..bobs.Bobs import *
 from . import Config
 import math
+import multiprocessing
+
 
 class Engine(object):
     def __init__(self, engine_type):
         self.engine_type = engine_type # Describes the type of engine
+        self.is_split = False # The data are not split at the beginning
         
     def __repr___(self):
         return "Engine "+str(self.engine_type)
@@ -132,8 +135,16 @@ class TileEngine(Engine):
             tiles = []
             
             # Split only works for rasters for now
-            assert(isinstance(bob,Raster))
+            # For all other data types (e.g., vectors) we just duplicate the data
+            if not isinstance(bob,Raster): # Check if not a raster
+                for tile_index in range(num_tiles):
+                    tiles.append(bob) # Just copy the entire bob to a tile list
+                    
+                new_inputs.append(tiles) # Now add the tiles to new_inputs
+                continue # Now skip to the next bob in the list
 
+            # This code will only be reached for Raster data types
+            assert(isinstance(bob,Raster))
             # Sanity check, if tiles are larger than data
             if num_tiles > bob.nrows:
                 num_tiles = bob.nrows # Reset to be 1 row per tile
@@ -168,10 +179,13 @@ class TileEngine(Engine):
                 tile.ncols = tile_ncols
                 tile.r =     tile_r
                 tile.c =     tile_c
+                tile.cellsize = bob.cellsize
+                tile.datatype = bob.datatype
+                # FIXME: Need a better method to copy these over.
                 
                 # Split the data (depends on raster/vector)
                 tile.data = bob.get_data(tile_r,tile_c,tile_nrows,tile_ncols)
-                
+                                
                 # Save tiles
                 tiles.append(tile)
             # Save list of tiles (split Bobs) to new inputs
@@ -206,6 +220,134 @@ class TileEngine(Engine):
     
 tile_engine = TileEngine()
 
+# This worker is used for parallel execution in the multiprocessing engine    
+def worker(input_list):
+    
+    rank = input_list[0]      # Rank
+    iq = input_list[1]        # Input queue
+    oq = input_list[2]        # Output queue
+    primitive = input_list[3] # Primitive to run
+
+    # Get the split bobs to process
+    splitbobs = iq.get()
+
+    # Run the primitive on the splitbobs, record the output
+    out = primitive(*splitbobs)
+
+    oq.put(out) # Save the output in the output queue
+
+    return "worker %d %s" % (rank,splitbobs) # Can be printed if needed
+    
+# FIXME: Change to Engines.py    
+class MultiprocessingEngine(Engine):
+    def __init__(self):
+        # FIXME: Need an object to describe type of engines rather than a string
+        super(MultiprocessingEngine,self).__init__("MultiprocessingEngine")
+        self.is_split=False
+        
+    def split(self, bobs):
+        # Run the split from the TileEngine
+        # That will provide a list of bobs in inputs to parallelize
+        tile_engine.split(bobs)
+        self.is_split = True
+        
+    # Merge (>)
+    def merge(self, bobs):
+        # Now that everything is merged set split to be false
+        self.is_split = False
+
+    # Sequence (==)
+    def sequence(self, bobs):
+        # If the Bobs are split, then handle it
+        # If they are not, then there is nothing to do
+        if self.is_split is True:
+            # FIXME: Need to handle this
+            print("NEED TO LOOP OVER SPLIT BOBS")
+            pass # Loop over all the split Bobs
+        pass
+
+    # This method changes the run behavior to be in parallel.
+    def run(self, primitive):
+        print("Running", primitive)
+
+        # Get the name of the primitive operation being executed
+        name = primitive.__class__.__name__
+
+        # Get the inputs        
+        inputs = Config.inputs
+    
+        # Save the flows information in the global config data structure
+        # FIXME: The problem with this solution is all data will be stored
+        #        indefinitely, which is going to be a huge problem.
+        Config.flows[name] = {}
+        Config.flows[name]['input'] = inputs   
+
+        #import pdb; pdb.set_trace()
+
+
+        # If Bobs are not split, then it is easy
+        if Config.engine.is_split is False:
+            if isinstance(inputs,Bob):     # If it is a bob
+                inputs = primitive(inputs)    # Just pass in the bob
+            else:                          # If it is a list
+                inputs = primitive(*inputs)   # De-reference the list and pass as parameters
+        
+        else: # When they are split we have to handle the list of Bobs and run in parallel
+
+            # Make a pool of 4 processes
+            # FIXME: THIS IS FIXED FOR NOW
+            pool = multiprocessing.Pool(4)
+            
+            # Create a manager for the input and output queues (iq, oq)            
+            m = multiprocessing.Manager()
+            iq = m.Queue()
+            oq = m.Queue()
+            
+            # Add split bobs to the input queue to be processed
+            for splitbobs in inputs:
+                iq.put(splitbobs)
+
+            # How many times will we run the worker function using map
+            mapsize = len(inputs)
+            
+            # Make a list of ranks, queues, and primitives
+            # These will be used for map_inputs
+            ranklist = range(mapsize)
+            iqlist = [iq for i in range(mapsize)]
+            oqlist = [oq for i in range(mapsize)]
+            prlist = [primitive for i in range(mapsize)]
+        
+            # Create map inputs by zipping the lists we just created
+            map_inputs = zip(ranklist,iqlist,oqlist,prlist)
+                       
+            # Apply the inputs to the worker function using parallel map
+            # Results can be printed for output from the worker tasks
+            results = pool.map(worker, map_inputs)
+        
+            # Get the outputs from the output queue and save as new inputs
+            inputs = []
+            while not oq.empty():
+                output = oq.get() # Get one output from the queue
+                inputs.append(output) # Save to inputs
+            
+            # Done with the pool so close, then join (wait)
+            pool.close()
+            pool.join()
+
+        # Save the outputs from this primitive
+        Config.flows[name]['output'] = inputs
+        
+        # Save inputs from this/these primitive(s), for the next primitive
+        if primitive.passthrough is False: # Typical case
+            Config.inputs = inputs # Reset the inputs
+        else:
+            assert(Config.engine.is_split is False)
+            Config.inputs.append(inputs) # Add to the inputs
+            
+        return inputs
+
+    
+mp_engine = MultiprocessingEngine()
 
 
 
@@ -213,6 +355,10 @@ tile_engine = TileEngine()
 
 Config.engine = pass_engine
 Config.engine = tile_engine
+Config.engine = mp_engine
 
 
 print("Default engine",Config.engine)
+
+if __name__ == '__main__':
+    pass

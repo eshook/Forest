@@ -39,7 +39,10 @@ class Raster(Bob):
         self.data = np.zeros((self.nrows,self.ncols))
 
     def get_data(self, r, c, rh, cw):
-        return self.data[r:r+rh,c:c+cw]
+        # Remember, the array is upside down in GIS
+        # So when we take a slice, we must do it from the bottom
+        # which is why we are subtracting r/rh from nrows
+        return self.data[self.nrows-(r+rh):self.nrows-r,c:c+cw]
         
         
 # Vector Layer Bob

@@ -87,7 +87,7 @@ class AggregateSumPrim(Primitive):
                     out_kv.data[key] = {} # Create the entry and set val/cnt
                     out_kv.data[key]['val']=bob.data[key]['val']
                     out_kv.data[key]['cnt']=bob.data[key]['cnt']
-            
+                
         return out_kv
 
 AggregateSum = AggregateSumPrim()
@@ -119,49 +119,15 @@ class PartialSumRasterizePrim(Primitive):
 
     def __call__(self, zone = None, data = None):
 
-        #arr = np.zeros((data.nrows,data.ncols))
-        
-        print("type=",type(zone.data))
-        #for k in zone.data:
-        #    print("  key=",k)
-        
-        print("data0=",data.data[0])
-        
-        #            0=xmin,3=ymax, 1=pixel width, 5=pixel height, 2=line width, 4=line width
-        # We might want -cellsize for 5
-        #transform = [data.x,data.cellsize,0,data.y+data.h,0,-data.cellsize]
+        # Create the transform for rasterio to rasterize the vector zones
+        #print("bounds",data.x, data.y, data.x+data.w, data.y+data.h, data.cellsize, data.cellsize)
         transform = rasterio.transform.from_origin(data.x,data.y+data.h,data.cellsize,data.cellsize)
         
-        # out_shape = (data.nrows,data.ncols)
-        #arr = rasterio.features.rasterize(shapes = [data.data], out_shape=(data.nrows,data.ncols), transform = transform)
-        
-        print("outshape",data.data.shape)
-        print("transform",transform)
-        
-        # Kinda working
-        #arr = rasterio.features.rasterize(shapes = zone.data, out_shape=data.data.shape, transform = transform)
-
-        #print("first entry",zone.data[0]['geometry'])
-        
-        # FIRST ELEMENT WORKS!
-        #arr = rasterio.features.rasterize(shapes = [ (zone.data[0]['geometry'],int(zone.data[0]['properties']['STATEFP'])) ], out_shape=data.data.shape, transform = transform)
-        
+        # Create zoneshapes, which is the geometry + state FP
+        # FIXME: STATEFP needs to be an attribute to PartialSumRasterizePrim
         zoneshapes = ((f['geometry'],int(f['properties']['STATEFP'])) for f in zone.data)
         arr = rasterio.features.rasterize(shapes = zoneshapes, out_shape=data.data.shape, transform = transform)
         
-        '''
-        shapes = []
-        for f in zone.data:
-            shapes.append([ f['geometry'],f['properties']['STATEFP'] ])
-        
-        #shapes = ((geom,value) for geom, value in zip(zone.data[])
-        
-        zoneshapes = ((f['geometry'],f['properties']['STATEFP']) for f in zone.data)
-        
-        print("zoneshapes[0]=",zoneshapes[0])
-        
-        arr = rasterio.features.rasterize(shapes = zoneshapes, out_shape=data.data.shape, transform = transform)
-        '''
         
         # TEMPORARY FOR LOOKING AT THE RESULTS
         if(False):
@@ -175,8 +141,6 @@ class PartialSumRasterizePrim(Primitive):
             print("arr max=",np.max(arr))
             #print("arr avg=",np.avg(arr))
             print("arr shape",arr.shape)
-        
-        print("first entry in arr",arr[0][0])
         
         
         # Create the key_value output bob
@@ -252,9 +216,7 @@ class PartialSumRasterizePrim(Primitive):
             # Add them all up and put them in the array
             d[z]+=np.sum(datamask)
                 
-                
-        print("d=",d)
-        
+        # Loop over d and counts to create output keyvalue bob                
         for i in range(len(counts[0])):
             countskey = counts[0][i]
             countscnt = counts[1][i]
@@ -262,10 +224,8 @@ class PartialSumRasterizePrim(Primitive):
             out_kv.data[countskey] = {}
             out_kv.data[countskey]['val'] = dsum
             out_kv.data[countskey]['cnt'] = countscnt
-            
-        
+                    
         del arr
-
 
         return out_kv
 
