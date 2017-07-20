@@ -265,55 +265,18 @@ class PartialSumRasterizePrim(Primitive):
             
         # Try 4 np.bincount with np.unique
         
-#         zonearr_flat = zonearr.flatten()
-
-#         # Bottle-neck 1. np.unique
-#         # Consider doing only once for a time series of the requested area
-#         zonereal,zonereal_counts = np.unique(zonearr, return_counts = True)
-#         dict_count = dict(zip(zonereal, zonereal_counts.T))
-        
-#         # Create a dummy zone id list to match those dummy zone sums created by bincount
-#         zonedummy = list(range(zonereal.min(),zonereal.max()+1))
-        
-#         # Conduct Zonal analysis
-#         # Bottle-neck 2. np.bincount
-#         zonedummy_sums = np.bincount(zonearr_flat, weights=data.data.flatten())
-        
-#         print("Output Length: ", len(zonedummy_sums))
-#         print(zonedummy_sums)
-#         print("Dummy Zone Length: ", len(zonedummy))
-#         print(zonedummy)
-#         print("Real Zone Length: ", len(zonereal))
-#         print(zonereal, zonereal_counts)
-        
-#         # Zip zone ids with valid zone sums and zone counts into a dictionary
-#         dict_sum = dict(zip(zonedummy, zonedummy_sums.T))
-#         dict_count = dict(zip(zonereal, zonereal_counts.T))
-#         for zoneid in zonereal:
-#             out_kv.data[zoneid] = {}
-#             out_kv.data[zoneid]['val'] = dict_sum[zoneid]
-#             out_kv.data[zoneid]['cnt'] = dict_count[zoneid]
-#         print(out_kv)
-        
-        
-        # Try 5 np.bincount with pandas.'unique'
-        
         zonearr_flat = zonearr.flatten()
-        
-        # pandas 'unique'
-        import pandas as pd
-        zone_ss = pd.Series(zonearr_flat)
-        dict_count = zone_ss.value_counts().to_dict()
-        zonereal = list(dict_count.keys())
+
+        # Bottle-neck 1. np.unique
+        # Consider doing only once for a time series of the requested area
+        zonereal,zonereal_counts = np.unique(zonearr, return_counts = True)
+        dict_count = dict(zip(zonereal, zonereal_counts.T))
         
         # Create a dummy zone id list to match those dummy zone sums created by bincount
-        zonedummy = list(range(int(min(zonereal)),int(max(zonereal))+1))
+        zonedummy = list(range(zonereal.min(),zonereal.max()+1))
         
         # Conduct Zonal analysis
         # Bottle-neck 2. np.bincount
-        # zone_df = pd.DataFrame({'index': zonearr_flat, 'value': zonearr_flat})
-        # zone_group = zone_df.groupby(['index'], sort=False).sum()
-        # print(dict(list(zone_group)))
         zonedummy_sums = np.bincount(zonearr_flat, weights=data.data.flatten())
         
         print("Output Length: ", len(zonedummy_sums))
@@ -321,15 +284,52 @@ class PartialSumRasterizePrim(Primitive):
         print("Dummy Zone Length: ", len(zonedummy))
         print(zonedummy)
         print("Real Zone Length: ", len(zonereal))
+        print(zonereal, zonereal_counts)
         
-        # Zip zone ids with valid zone sums into a dictionary
+        # Zip zone ids with valid zone sums and zone counts into a dictionary
         dict_sum = dict(zip(zonedummy, zonedummy_sums.T))
-        # Zip values and counts into small dict and put them into the Bob
+        dict_count = dict(zip(zonereal, zonereal_counts.T))
         for zoneid in zonereal:
             out_kv.data[zoneid] = {}
             out_kv.data[zoneid]['val'] = dict_sum[zoneid]
             out_kv.data[zoneid]['cnt'] = dict_count[zoneid]
         print(out_kv)
+        
+        
+        # Try 5 np.bincount with pandas.'unique'
+        
+        # zonearr_flat = zonearr.flatten()
+        #
+        # # pandas 'unique'
+        # import pandas as pd
+        # zone_ss = pd.Series(zonearr_flat)
+        # dict_count = zone_ss.value_counts().to_dict()
+        # zonereal = list(dict_count.keys())
+        #
+        # # Create a dummy zone id list to match those dummy zone sums created by bincount
+        # zonedummy = list(range(int(min(zonereal)),int(max(zonereal))+1))
+        #
+        # # Conduct Zonal analysis
+        # # Bottle-neck 2. np.bincount
+        # # zone_df = pd.DataFrame({'index': zonearr_flat, 'value': zonearr_flat})
+        # # zone_group = zone_df.groupby(['index'], sort=False).sum()
+        # # print(dict(list(zone_group)))
+        # zonedummy_sums = np.bincount(zonearr_flat, weights=data.data.flatten())
+        #
+        # print("Output Length: ", len(zonedummy_sums))
+        # print(zonedummy_sums)
+        # print("Dummy Zone Length: ", len(zonedummy))
+        # print(zonedummy)
+        # print("Real Zone Length: ", len(zonereal))
+        #
+        # # Zip zone ids with valid zone sums into a dictionary
+        # dict_sum = dict(zip(zonedummy, zonedummy_sums.T))
+        # # Zip values and counts into small dict and put them into the Bob
+        # for zoneid in zonereal:
+        #     out_kv.data[zoneid] = {}
+        #     out_kv.data[zoneid]['val'] = dict_sum[zoneid]
+        #     out_kv.data[zoneid]['cnt'] = dict_count[zoneid]
+        # print(out_kv)
         
         del zonearr
 
