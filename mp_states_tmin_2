@@ -1,0 +1,225 @@
+Timer unit: 1e-06 s
+
+Total time: 0 s
+File: /home/duanx138/mpc-forest/forest/primitives/Primitives.py
+Function: __call__ at line 120
+
+Line #      Hits         Time  Per Hit   % Time  Line Contents
+==============================================================
+   120                                               def __call__(self, zone = None, data = None):
+   121                                           
+   122                                                   #arr = np.zeros((data.nrows,data.ncols))
+   123                                                   
+   124                                                   print("type=",type(zone.data))
+   125                                                   #for k in zone.data:
+   126                                                   #    print("  key=",k)
+   127                                                   
+   128                                                   print("data0=",data.data[0])
+   129                                                   
+   130                                                   #            0=xmin,3=ymax, 1=pixel width, 5=pixel height, 2=line width, 4=line width
+   131                                                   # We might want -cellsize for 5
+   132                                                   #transform = [data.x,data.cellsize,0,data.y+data.h,0,-data.cellsize]
+   133                                                   transform = rasterio.transform.from_origin(data.x,data.y+data.h,data.cellsize,data.cellsize)
+   134                                                   
+   135                                                   # out_shape = (data.nrows,data.ncols)
+   136                                                   #arr = rasterio.features.rasterize(shapes = [data.data], out_shape=(data.nrows,data.ncols), transform = transform)
+   137                                                   
+   138                                                   print("outshape",data.data.shape)
+   139                                                   print("transform",transform)
+   140                                                   
+   141                                                   # Kinda working
+   142                                                   #arr = rasterio.features.rasterize(shapes = zone.data, out_shape=data.data.shape, transform = transform)
+   143                                           
+   144                                                   #print("first entry",zone.data[0]['geometry'])
+   145                                                   
+   146                                                   # FIRST ELEMENT WORKS!
+   147                                                   #arr = rasterio.features.rasterize(shapes = [ (zone.data[0]['geometry'],int(zone.data[0]['properties']['STATEFP'])) ], out_shape=data.data.shape, transform = transform)
+   148                                                   
+   149                                                   zoneshapes = ((f['geometry'],int(f['properties']['STATEFP'])) for f in zone.data)
+   150                                                   zonearr = rasterio.features.rasterize(shapes = zoneshapes, out_shape=data.data.shape, transform = transform)
+   151                                                   
+   152                                                   '''
+   153                                                   shapes = []
+   154                                                   for f in zone.data:
+   155                                                       shapes.append([ f['geometry'],f['properties']['STATEFP'] ])
+   156                                                   
+   157                                                   #shapes = ((geom,value) for geom, value in zip(zone.data[])
+   158                                                   
+   159                                                   zoneshapes = ((f['geometry'],f['properties']['STATEFP']) for f in zone.data)
+   160                                                   
+   161                                                   print("zoneshapes[0]=",zoneshapes[0])
+   162                                                   
+   163                                                   arr = rasterio.features.rasterize(shapes = zoneshapes, out_shape=data.data.shape, transform = transform)
+   164                                                   '''
+   165                                                   
+   166                                                   # TEMPORARY FOR LOOKING AT THE RESULTS
+   167                                                   if(False):
+   168                                                       with rasterio.open("examples/data/glc2000.tif") as src:
+   169                                                           profile = src.profile
+   170                                                           profile.update(count=1,compress='lzw')
+   171                                                           with rasterio.open('result.tif','w',**profile) as dst:
+   172                                                               dst.write_band(1,arr)
+   173                                                       
+   174                                                       print("arr min=",np.min(arr))
+   175                                                       print("arr max=",np.max(arr))
+   176                                                       #print("arr avg=",np.avg(arr))
+   177                                                       print("arr shape",arr.shape)
+   178                                                   
+   179                                                   print("first entry in arr",zonearr[0][0])
+   180                                                   
+   181                                                   
+   182                                                   # Create the key_value output bob
+   183                                                   out_kv = KeyValue(zone.h,zone.w,zone.y,zone.x)
+   184                                           
+   185                                                   print("Processing raster of size",data.nrows,"x",data.ncols)
+   186                                                   
+   187                                           #         # Instead of looping over raster we can
+   188                                           #         # zip zone[r] and data[r] to get key/value pairs
+   189                                           #         # then we can apply for k,v in pairs: d[k] +=v
+   190                                           #         # from : https://stackoverflow.com/questions/9285995/python-generator-expression-for-accumulating-dictionary-values
+   191                                           #         # look here too : https://bugra.github.io/work/notes/2015-01-03/i-wish-i-knew-these-things-when-i-first-learned-python/
+   192                                           #         # Loop over the raster (RLayer)
+   193                                           #         '''
+   194                                           #         for r in range(len(data.data)):
+   195                                           #             for c in range(len(data.data[0])):
+   196                                           #                 key = str(arr[r][c])
+   197                                           #                 if key in out_kv.data:
+   198                                           #                     out_kv.data[key]['val'] += data.data[r][c]
+   199                                           #                     out_kv.data[key]['cnt'] += 1
+   200                                           #                 else:
+   201                                           #                     out_kv.data[key] = {}
+   202                                           #                     out_kv.data[key]['val'] = data.data[r][c]
+   203                                           #                     out_kv.data[key]['cnt'] = 1
+   204                                           #         '''
+   205                                                   
+   206                                           #         #https://docs.scipy.org/doc/numpy-1.12.0/reference/generated/numpy.unique.html#numpy.unique
+   207                                           #         counts = np.unique(arr,return_counts=True)
+   208                                           #         print("counts=",counts)
+   209                                                   
+   210                                           #         # Loop over zone IDs
+   211                                           #         for z in counts[0]:
+   212                                           #             print("zoneid",z)
+   213                                                       
+   214                                           #         # Create a dictionary from collections.defaultdict
+   215                                           #         d=defaultdict(int)
+   216                                           #         # Loop over the data and
+   217                                           #         # Zip the zone keys (arr) and the data values into key,value pairs
+   218                                           #         # Then add up the values from data and put into dictionary
+   219                                           #         for r in range(len(data.data)):
+   220                                                       
+   221                                                       
+   222                                           #             if(r%100==0):
+   223                                           #                 print("r=",r,"/",len(data.data))
+   224                                           #             #Try 1, too slow    
+   225                                           #             #kvzip = zip(arr[r],data.data[r])
+   226                                           #             #for k,v in kvzip: d[k]+=v
+   227                                                       
+   228                                           #             # Try 2, faster than Try 1, but still too slow.
+   229                                           #             '''
+   230                                           #             zonerow = arr[r]
+   231                                           #             datarow = data.data[r]
+   232                                           #             # Loop over unique zones
+   233                                           #             for z in counts[0]:
+   234                                           #                 # This should set elements for zone z to 1, all others to 0
+   235                                           #                 zonemask = zonerow == z
+   236                                           #                 # Should zero out entries that are not the same as zone
+   237                                           #                 # So now you have an array of data elements that all belong to zone z
+   238                                           #                 datamask = datarow * zonemask
+   239                                           #                 # Add them all up and put them in the array
+   240                                           #                 d[z]+=np.sum(datamask)
+   241                                           #             '''
+   242                                                   
+   243                                           #         # Try 3, zonemask entire arrays (memory intensive, but faster)
+   244                                           #         for z in counts[0]:
+   245                                           #             print("z=",z)
+   246                                                       
+   247                                           #             # This should set elements for zone z to 1, all others to 0
+   248                                           #             zonemask = arr == z
+   249                                           #             # Should zero out entries that are not the same as zone
+   250                                           #                 # So now you have an array of data elements that all belong to zone z
+   251                                           #             datamask = data.data * zonemask
+   252                                           #             # Add them all up and put them in the array
+   253                                           #             d[z]+=np.sum(datamask)
+   254                                                           
+   255                                                           
+   256                                           #         print("d=",d)
+   257                                                   
+   258                                           #         for i in range(len(counts[0])):
+   259                                           #             countskey = counts[0][i]
+   260                                           #             countscnt = counts[1][i]
+   261                                           #             dsum = d[countskey]
+   262                                           #             out_kv.data[countskey] = {}
+   263                                           #             out_kv.data[countskey]['val'] = dsum
+   264                                           #             out_kv.data[countskey]['cnt'] = countscnt
+   265                                                       
+   266                                                   # Try 4 np.bincount with np.unique
+   267                                                   
+   268                                                   zonearr_flat = zonearr.flatten()
+   269                                           
+   270                                                   # Bottle-neck 1. np.unique
+   271                                                   # Consider doing only once for a time series of the requested area
+   272                                                   zonereal,zonereal_counts = np.unique(zonearr, return_counts = True)
+   273                                                   dict_count = dict(zip(zonereal, zonereal_counts.T))
+   274                                                   
+   275                                                   # Create a dummy zone id list to match those dummy zone sums created by bincount
+   276                                                   zonedummy = list(range(zonereal.min(),zonereal.max()+1))
+   277                                                   
+   278                                                   # Conduct Zonal analysis
+   279                                                   # Bottle-neck 2. np.bincount
+   280                                                   zonedummy_sums = np.bincount(zonearr_flat, weights=data.data.flatten())
+   281                                                   
+   282                                                   print("Output Length: ", len(zonedummy_sums))
+   283                                                   print(zonedummy_sums)
+   284                                                   print("Dummy Zone Length: ", len(zonedummy))
+   285                                                   print(zonedummy)
+   286                                                   print("Real Zone Length: ", len(zonereal))
+   287                                                   print(zonereal, zonereal_counts)
+   288                                                   
+   289                                                   # Zip zone ids with valid zone sums and zone counts into a dictionary
+   290                                                   dict_sum = dict(zip(zonedummy, zonedummy_sums.T))
+   291                                                   dict_count = dict(zip(zonereal, zonereal_counts.T))
+   292                                                   for zoneid in zonereal:
+   293                                                       out_kv.data[zoneid] = {}
+   294                                                       out_kv.data[zoneid]['val'] = dict_sum[zoneid]
+   295                                                       out_kv.data[zoneid]['cnt'] = dict_count[zoneid]
+   296                                                   print(out_kv)
+   297                                                   
+   298                                                   
+   299                                                   # Try 5 np.bincount with pandas.'unique'
+   300                                                   
+   301                                                   # zonearr_flat = zonearr.flatten()
+   302                                                   #
+   303                                                   # # pandas 'unique'
+   304                                                   # import pandas as pd
+   305                                                   # zone_ss = pd.Series(zonearr_flat)
+   306                                                   # dict_count = zone_ss.value_counts().to_dict()
+   307                                                   # zonereal = list(dict_count.keys())
+   308                                                   #
+   309                                                   # # Create a dummy zone id list to match those dummy zone sums created by bincount
+   310                                                   # zonedummy = list(range(int(min(zonereal)),int(max(zonereal))+1))
+   311                                                   #
+   312                                                   # # Conduct Zonal analysis
+   313                                                   # # Bottle-neck 2. np.bincount
+   314                                                   # # zone_df = pd.DataFrame({'index': zonearr_flat, 'value': zonearr_flat})
+   315                                                   # # zone_group = zone_df.groupby(['index'], sort=False).sum()
+   316                                                   # # print(dict(list(zone_group)))
+   317                                                   # zonedummy_sums = np.bincount(zonearr_flat, weights=data.data.flatten())
+   318                                                   #
+   319                                                   # print("Output Length: ", len(zonedummy_sums))
+   320                                                   # print(zonedummy_sums)
+   321                                                   # print("Dummy Zone Length: ", len(zonedummy))
+   322                                                   # print(zonedummy)
+   323                                                   # print("Real Zone Length: ", len(zonereal))
+   324                                                   #
+   325                                                   # # Zip zone ids with valid zone sums into a dictionary
+   326                                                   # dict_sum = dict(zip(zonedummy, zonedummy_sums.T))
+   327                                                   # # Zip values and counts into small dict and put them into the Bob
+   328                                                   # for zoneid in zonereal:
+   329                                                   #     out_kv.data[zoneid] = {}
+   330                                                   #     out_kv.data[zoneid]['val'] = dict_sum[zoneid]
+   331                                                   #     out_kv.data[zoneid]['cnt'] = dict_count[zoneid]
+   332                                                   # print(out_kv)
+   333                                                   
+   334                                                   del zonearr
+   335                                           
+   336                                                   return out_kv
