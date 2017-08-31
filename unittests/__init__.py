@@ -5,7 +5,7 @@ Use of this source code is governed by a BSD-style license that can be found in 
 @contributors: <Contribute and add your name here!>
 """
 
-from .Primitive import *
-from .Primitives import *
-from .PrimitivesRaster import *
-from .IO import *
+# Import unittests
+from .test_Bob import *
+from .test_Bobs import *
+from .test_PrimitivesRaster import *

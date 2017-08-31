@@ -117,15 +117,16 @@ class PartialSumRasterizePrim(Primitive):
         # Call the __init__ for Primitive  
         super(PartialSumRasterizePrim,self).__init__("PartialSumRasterize")
 
-    def __call__(self, zone = None, data = None):
+    def __call__(self, zone = None, data = None, properties_name = None):
 
         # Create the transform for rasterio to rasterize the vector zones
         #print("bounds",data.x, data.y, data.x+data.w, data.y+data.h, data.cellsize, data.cellsize)
         transform = rasterio.transform.from_origin(data.x,data.y+data.h,data.cellsize,data.cellsize)
         
+        properties_name = 'STATEFP' # or 'geoid'
+        
         # Create zoneshapes, which is the geometry + state FP
-        # FIXME: STATEFP needs to be an attribute to PartialSumRasterizePrim
-        zoneshapes = ((f['geometry'],int(f['properties']['STATEFP'])) for f in zone.data)
+        zoneshapes = ((f['geometry'],int(f['properties'][properties_name])) for f in zone.data)
         arr = rasterio.features.rasterize(shapes = zoneshapes, out_shape=data.data.shape, transform = transform)
         
         

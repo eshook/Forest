@@ -142,7 +142,7 @@ class ShapefileReadPrim(Primitive):
         vector = Vector(miny,minx,maxy-miny,maxx-minx,None,None)
         vector.geom_types = geom_types
         vector.sr = spatialReference
-        vector.setLayer(newlayer)
+        vector.data = newlayer
         return vector
 
     def reg(self, filename):
