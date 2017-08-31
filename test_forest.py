@@ -5,6 +5,11 @@ Use of this source code is governed by a BSD-style license that can be found in 
 @contributors: <Contribute and add your name here!>
 """
 
+# Begin coverage testing
+import coverage
+cov = coverage.coverage()
+cov.start()
+
 from forest import *
 import unittest
 
@@ -21,3 +26,7 @@ unittest.TextTestRunner(verbosity=2).run(full_suite)
 
 # Use this to test a single suite (e.g., test_Bob)
 #unittest.TextTestRunner(verbosity=2).run(test_Bob_suite)
+
+# Stop coverage testing and print out a report on percent of code covered by testing
+cov.stop()
+cov.report()

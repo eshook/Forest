@@ -62,6 +62,37 @@ class TestPrimitivesRaster(unittest.TestCase):
         self.assertTrue((oraster.data ==ones_array).all())
         #self.assertListEqual(oraster.data,ones_array)
         
+    def test_LocalMinimum(self):
+        # Create a ones array
+        valid_array = np.zeros((4,4))
+        test_array = np.ones((4,4))
+        zero_array = np.zeros((4,4))
+        
+        test_array[0][0] = -1
+        test_array[1][2] = -10
+        test_array[2][1] = -50
+        test_array[2][0] = -234234234        
+
+        zero_array[0][0] = 1
+        zero_array[1][2] = 1
+        zero_array[2][1] = 1
+        zero_array[2][0] = 1        
+
+        valid_array[0][0] = -1
+        valid_array[1][2] = -10
+        valid_array[2][1] = -50
+        valid_array[2][0] = -234234234        
+
+        self.raster0.data = zero_array
+        self.raster1.data = test_array
+
+        # Minimum of two arrays
+        oraster = LocalMinimum(self.raster0,self.raster1)
+                
+        # Should be valid array
+        self.assertTrue((oraster.data ==valid_array).all())
+        #self.assertListEqual(oraster.data,ones_array)
+        
         
 
 # Create the TestBobs suite        
