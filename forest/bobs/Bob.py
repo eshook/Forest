@@ -23,4 +23,3 @@ class Bob(object):
 
     def __call__(self):
         return self.data
-
