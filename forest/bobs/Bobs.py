@@ -2,7 +2,7 @@
 Copyright (c) 2017 Eric Shook. All rights reserved.
 Use of this source code is governed by a BSD-style license that can be found in the LICENSE file.
 @author: eshook (Eric Shook, eshook@gmail.edu)
-@contributors: (Jacob Arndt, arndt204@umn.edu; )
+@contributors: (Luyi Hunter, chen3461@umn.edu; Xinran Duan, duanx138@umn.edu)
 @contributors: <Contribute and add your name here!>
 """
 import numpy as np
@@ -20,7 +20,7 @@ from .Bob import *
 # Raster Layer Bob
 class Raster(Bob):
     
-    def __init__(self, y = 0, x = 0, h = 10, w = 10, s = 0, d = 0, nrows = 10, ncols = 10, cellsize = 1):
+    def __init__(self, y = 0, x = 0, h = 10, w = 10, s = 0, d = 0, nrows = 10, ncols = 10, cellsize = 1, filename = None, nodatavalue = None):
         
         # Call the __init__ for Bob        
         super(Raster, self).__init__(y, x, h, w, s, d)
