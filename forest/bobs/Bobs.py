@@ -47,8 +47,22 @@ class Raster(Bob):
         # So when we take a slice, we must do it from the bottom
         # which is why we are subtracting r/rh from nrows
         return self.data[self.nrows-(r+rh):self.nrows-r,c:c+cw]
-        
-        
+
+    # Generator that loops over the raster data
+    # and returns the r, c for each element  
+    def iterrc(self):
+        for r in range(self.nrows):
+            for c in range(self.ncols):
+                yield r,c
+    
+    # Generator that loops over the raster data
+    # and returns the r,c for each element BUT DOES NOT INCLUDE
+    # a buffered area along the edge of the raster defined by buffersize
+    def iterrcbuffer(self,buffersize):
+        for r in range(buffersize,self.nrows-buffersize):
+                for c in range(buffersize,self.ncols-buffersize):
+                    yield r,c
+    
 # Vector Layer Bob
 class Vector(Bob):        
     def __init__(self,y = 0, x = 0, h = 10, w = 10, s = 0, d = 0):

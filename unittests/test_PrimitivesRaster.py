@@ -93,7 +93,41 @@ class TestPrimitivesRaster(unittest.TestCase):
         self.assertTrue((oraster.data ==valid_array).all())
         #self.assertListEqual(oraster.data,ones_array)
         
+    
+    def test_iterrc(self):
+        raster0test = self.raster0
         
+        # Manual list building
+        manuallist = []
+        for r in range(raster0test.nrows):
+            for c in range(raster0test.ncols):
+                manuallist.append([r,c])
+        
+        # iterrc generator list
+        iterrclist = []
+        for r,c in raster0test.iterrc():
+            iterrclist.append([r,c])
+                
+        self.assertEqual(manuallist,iterrclist)
+    
+    def test_iterrcbuffer(self):
+
+        buffersize = 1
+            
+        raster0test = self.raster0
+        
+        # Manual list building
+        manuallist = []
+        for r in range(buffersize,raster0test.nrows-buffersize):
+            for c in range(buffersize,raster0test.ncols-buffersize):
+                manuallist.append([r,c])
+        
+        # iterrc generator list
+        iterrclist = []
+        for r,c in raster0test.iterrcbuffer(buffersize):
+            iterrclist.append([r,c])
+                
+        self.assertEqual(manuallist,iterrclist)
 
 # Create the TestBobs suite        
 test_PrimitivesRaster_suite = unittest.TestLoader().loadTestsFromTestCase(TestPrimitivesRaster)
