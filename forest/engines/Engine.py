@@ -10,7 +10,7 @@ from ..bobs.Bobs import *
 from . import Config
 import math
 import multiprocessing
-
+import numpy as np
 
 class Engine(object):
     def __init__(self, engine_type):
@@ -137,6 +137,57 @@ class TileEngine(Engine):
             # Split only works for rasters for now
             # For all other data types (e.g., vectors) we just duplicate the data
             if not isinstance(bob,Raster): # Check if not a raster
+				#spatio temporal point decomposition by box based splitting
+                if isinstance(bob,STPoint):
+                    #this should already be calculated and should be a global parameter
+                    distancebufferinmeters,timebufferinmilliseconds=0,0
+                    xranges=np.linspace(bob.x, bob.x+bob.w, num=num_tiles+1,endpoint=True)
+                    yranges=np.linspace(bob.y, bob.y+bob.h, num=num_tiles+1,endpoint=True)
+                    tranges=np.linspace(bob.s, bob.s+bob.d, num=num_tiles+1,endpoint=True,dtype=np.int64)
+                    boxwidth,boxheight,boxduration=xranges[1]-xranges[0],yranges[1]-yranges[0],tranges[1]-tranges[0]
+                    for i in xrange(len(xranges)-1):
+                        #buffer will be used during data addition
+                        box=STPoint(yranges[i],xranges[i], boxheight, boxwidth, tranges[i], boxduration)
+                        box.data=[]
+                        tiles.append(box)
+                    #This should be done in parallel, distribute the bob array, and boxes to cores, and finally merge to get filled bobs
+                    for d in bob.data:
+                        for box in tiles:
+                            #check if the point is with in the buffer ranges
+                            if d['x']>=np.max((box.x-distancebufferinmeters),bob.x) and d['x']<np.min((box.x-distancebufferinmeters+box.w+(2*distancebufferinmeters)),(bob.x+bob.w)) and d['y']>=np.max((box.y-distancebufferinmeters),bob.y) and d['y']<np.min((box.y-distancebufferinmeters+box.h+(2*distancebufferinmeters)),(bob.y+bob.h)) and d['t']>=np.max((box.s-timebufferinmilliseconds),bob.s) and d['t']<np.min((box.s-timebufferinmilliseconds+box.d+(2*timebufferinmilliseconds)),(bob.s+bob.d)):
+                                #Check if with in original box, if with in box add to data, else to halozone
+                                if d['x']>=box.x and d['x']<box.x+box.w and d['y']>=box.y and d['y']<box.y+box.h and d['t']>=box.s and d['t']<box.s+box.d:
+                                    box.data.append(d)
+                                else:
+                                    box.halo.append(d)
+                                continue
+                    new_inputs.append(tiles)
+                    continue
+                #spatial point decomposition by 2D splitting
+                if isinstance(bob,Point):
+                    #this should already be calculated and should be a global parameter
+                    distancebufferinmeters=0
+                    xranges=np.linspace(bob.x, bob.x+bob.w, num=num_tiles+1,endpoint=True)
+                    yranges=np.linspace(bob.y, bob.y+bob.h, num=num_tiles+1,endpoint=True)
+                    boxwidth,boxheight=xranges[1]-xranges[0],yranges[1]-yranges[0]
+                    for i in xrange(len(xranges)-1):
+                        #buffer will be used during data addition
+                        box=Point(yranges[i],xranges[i], boxheight, boxwidth, 0,0)
+                        box.data=[]
+                        tiles.append(box)
+                    #This should be done in parallel, distribute the bob array, and boxes to cores, and finally merge to get filled bobs
+                    for d in bob.data:
+                        for box in tiles:
+                            #check if the point is with in the buffer ranges
+                            if d['x']>=np.max((box.x-distancebufferinmeters),bob.x) and d['x']<np.min((box.x-distancebufferinmeters+box.w+(2*distancebufferinmeters)),(bob.x+bob.w)) and d['y']>=np.max((box.y-distancebufferinmeters),bob.y) and d['y']<np.min((box.y-distancebufferinmeters+box.h+(2*distancebufferinmeters)),(bob.y+bob.h)):
+                                #Check if with in original box, if with in box add to data, else to halozone
+                                if d['x']>=box.x and d['x']<box.x+box.w and d['y']>=box.y and d['y']<box.y+box.h:
+                                    box.data.append(d)
+                                else:
+                                    box.halo.append(d)
+                                continue
+                    new_inputs.append(tiles)
+                    continue
                 for tile_index in range(num_tiles):
                     tiles.append(bob) # Just copy the entire bob to a tile list
                     

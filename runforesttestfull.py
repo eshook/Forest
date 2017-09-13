@@ -72,7 +72,9 @@ def testit_forest(zonefilename, datafilename):
     
     print("finished forest")
 
-
+def nearrepeat_forest(datafilename):
+    output = run_primitive(CsvRead.reg(datafilename)< NearRepeat > AggregateSum)
+    return output
     
 if __name__ == '__main__':
     
