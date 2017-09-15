@@ -9,6 +9,7 @@ Use of this source code is governed by a BSD-style license that can be found in 
 import rasterio
 import rasterio.features
 from collections import defaultdict
+import numpy as np
 import pandas as pd
 
 from .Primitive import *
@@ -345,3 +346,52 @@ class PartialSumRasterizePrim(Primitive):
         return out_kv
 
 PartialSumRasterize = PartialSumRasterizePrim()
+
+class NearRepeatPrim(Primitive):
+    def __init__(self):
+
+        # Call the __init__ for Primitive  
+        super(NearRepeatPrim,self).__init__("NearRepeat")
+        
+    #Config should contain global parameters for the primitive
+    def __call__(self, bob):
+        # Create the key_value output bob
+        out_kv = KeyValue()
+        # FIXME: Putting default values as this should be global
+        distanceinterval=1000
+        timeinterval=86400000
+        maxdistance=5000
+        maxtime=432000000
+        timeranges=np.linspace(0,maxtime,num=(maxtime/timeinterval)+1,endpoint=True,dtype=np.int64)
+        distanceranges=np.linspace(0,maxdistance,num=(maxdistance/distanceinterval)+1,endpoint=True)
+        for i in xrange(len(timeranges)-1):
+            for j in xrange(len(distanceranges)-1):
+                out_kv.data[str(timeranges[i])+"-"+str(distanceranges[j])]={'val':0,'cnt':0}
+        #First we calculate inter-distance and inter-time calculation for the bob 
+        for i in xrange(len(bob.data)):
+            for j in xrange(len(bob.data)):
+                if i!=j:
+                    timeshift=np.abs(bob.data[j]['t']-bob.data[i]['t'])
+                    distanceshift= np.linalg.norm(np.asarray([bob.data[j]['x'],bob.data[j]['y']])-np.asarray([bob.data[i]['x'],bob.data[i]['y']]), 2, 0)
+                    for ranges in out_kv.data:
+                        timerange,distancerange=long(ranges.split('-')[0]),int(ranges.split('-')[1])
+                        if timeshift>=timerange and timeshift<timerange+timeinterval and distanceshift>=distancerange and distanceshift<distancerange+distanceinterval:
+                            out_kv.data[ranges]['cnt']+=1
+        #since we are calculating pairs two times, need to divide results by 2
+        for ranges in out_kv.data:
+            out_kv.data[ranges]['cnt']/=2
+        #Boundary calculation,since we have overlapping spatio temporal halo zones we have to avoid duplication
+        for i in xrange(len(bob.halo)):
+            for j in xrange(len(bob.data)):
+                #we won't calculate interactions between back halo zone and the neighboring bob slice to avoid duplication
+                if (bob.data[j]['x']>=bob.x and bob.data[j]['x']<bob.x+maxdistance and bob.data[j]['y']>=bob.y and bob.data[j]['y']<bob.y+maxdistance and bob.data[j]['t']>=bob.s and bob.data[j]['t']<bob.s+maxtime) and (bob.halo[i]['x']>=bob.x-maxdistance and bob.halo[i]['x']<bob.x and bob.halo[i]['y']>=bob.y-maxdistance and bob.halo[i]['y']<bob.y and bob.halo[i]['t']>=bob.s-maxtime and bob.data[i]['t']<bob.s):
+                    continue
+                timeshift=bob.data[j]['t']-bob.halo[i]['t']
+                distanceshift= np.linalg.norm(np.asarray([bob.data[j]['x'],bob.data[j]['y']])-np.asarray([bob.halo[i]['x'],bob.halo[i]['y']]), 2, 0)
+                for ranges in out_kv.data:
+                    timerange,distancerange=long(ranges.split('-')[0]),int(ranges.split('-')[1])
+                    if timeshift>=timerange and timeshift<timerange+timeinterval and distanceshift>=distancerange and distanceshift<distancerange+distanceinterval:
+                        out_kv.data[ranges]['cnt']+=1
+        return out_kv
+    
+NearRepeat = NearRepeatPrim()

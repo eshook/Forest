@@ -134,5 +134,17 @@ class STCube(Bob):
 
     def getTimeList(self):
         return self.timelist
-        
+
+#2D point layer
+class Point(Vector):
+    def __init__(self,y = 0, x = 0, h = 10, w = 10, s = 0, d = 0):
+        super(Point,self).__init__(y,x,h,w,s,d)
+        #we need a seperate container for halo zones
+        self.halo = []
+#Spatio temporal point layer
+class STPoint(Point):
+    def __init__(self,y = 0, x = 0, h = 10, w = 10, s = 0, d = 0):
+        super(STPoint,self).__init__(y,x,h,w,s,d)
+        #we need a seperate container for halo zones
+        self.halo = []        
     
