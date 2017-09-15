@@ -2,6 +2,7 @@
 Copyright (c) 2017 Eric Shook. All rights reserved.
 Use of this source code is governed by a BSD-style license that can be found in the LICENSE file.
 @author: eshook (Eric Shook, eshook@gmail.edu)
+@contributors: (Luyi Hunter, chen3461@umn.edu; Xinran Duan, duanx138@umn.edu)
 @contributors: <Contribute and add your name here!>
 """
 
@@ -10,7 +11,9 @@ from ..bobs.Bobs import *
 from . import Config
 import math
 import multiprocessing
+
 import numpy as np
+import gdal
 
 class Engine(object):
     def __init__(self, engine_type):
@@ -121,7 +124,8 @@ class TileEngine(Engine):
         
         # Set the number of tiles to split to
         # FIXME: Eventually this should be determined or user-defined.
-        num_tiles = 2
+        num_tiles = Config.n_tile
+        print("-> Number of tiles = ", num_tiles)
         
         # If already split, do nothing.
         if self.is_split is True:
@@ -189,6 +193,9 @@ class TileEngine(Engine):
                     new_inputs.append(tiles)
                     continue
                 for tile_index in range(num_tiles):
+                    ######FIX ME: Fetch vector data later in worker#######
+                    # tiles.append('vector')
+                    ###+++++++++++++++++++++++++++++++++++++++++++++++++##
                     tiles.append(bob) # Just copy the entire bob to a tile list
                     
                 new_inputs.append(tiles) # Now add the tiles to new_inputs
@@ -232,10 +239,17 @@ class TileEngine(Engine):
                 tile.c =     tile_c
                 tile.cellsize = bob.cellsize
                 tile.datatype = bob.datatype
+                
+                ######################################################
+                ## Copy filename from Raster Bob to each tile
+                tile.filename = bob.filename 
+                tile.nodatavalue = bob.nodatavalue
+                
                 # FIXME: Need a better method to copy these over.
                 
                 # Split the data (depends on raster/vector)
-                tile.data = bob.get_data(tile_r,tile_c,tile_nrows,tile_ncols)
+                # tile.data = bob.get_data(tile_r,tile_c,tile_nrows,tile_ncols)
+                ######################################################
                                 
                 # Save tiles
                 tiles.append(tile)
@@ -282,13 +296,39 @@ def worker(input_list):
     # Get the split bobs to process
     splitbobs = iq.get()
 
+    ######################################################
+    tile = splitbobs[1]
+    filehandle = gdal.Open(tile.filename)
+    band = filehandle.GetRasterBand(1)
+    reverse_rnum = filehandle.RasterYSize-tile.r-tile.nrows
+    tile.data = band.ReadAsArray(tile.c,reverse_rnum,tile.ncols,tile.nrows)
+    ######################################################
+    
+    ######FIX ME: Fetch vector data (does not work for now)########
+    vector_data = []
+    for bob in Config.inputs:
+        if not isinstance(bob,Raster):
+            vector_data.append(bob)
+            break
+        else:
+            continue
     # Run the primitive on the splitbobs, record the output
-    out = primitive(*splitbobs)
-
+    out = primitive(vector_data[0], tile)
+    ######+++++++++++++++++++++++++++++++++++++++++++++++++########
+    
+    # Run the primitive on the splitbobs, record the output
+    out = primitive(splitbobs[0], tile)
+    
+    ######################################################
+    ## delete the tile.data before passing output 
+    del tile
+    tile = None
+    ######################################################
+                                     
     oq.put(out) # Save the output in the output queue
 
-    return "worker %d %s" % (rank,splitbobs) # Can be printed if needed
-    
+    return "worker %d %s" % (rank,splitbobs)    
+
 # FIXME: Change to Engines.py    
 class MultiprocessingEngine(Engine):
     def __init__(self):
@@ -332,9 +372,7 @@ class MultiprocessingEngine(Engine):
         #        indefinitely, which is going to be a huge problem.
         Config.flows[name] = {}
         Config.flows[name]['input'] = inputs   
-
-        #import pdb; pdb.set_trace()
-
+        print(inputs)
 
         # If Bobs are not split, then it is easy
         if Config.engine.is_split is False:
@@ -347,9 +385,11 @@ class MultiprocessingEngine(Engine):
 
             # Make a pool of 4 processes
             # FIXME: THIS IS FIXED FOR NOW
-            pool = multiprocessing.Pool(4)
+            print("-> Number of processes = ", Config.n_core)
+
+            pool = multiprocessing.Pool(Config.n_core)
             
-            # Create a manager for the input and output queues (iq, oq)            
+            # Create a manager for the input and output queues (iq, oq)  
             m = multiprocessing.Manager()
             iq = m.Queue()
             oq = m.Queue()
@@ -360,7 +400,8 @@ class MultiprocessingEngine(Engine):
 
             # How many times will we run the worker function using map
             mapsize = len(inputs)
-            
+            print(mapsize)
+
             # Make a list of ranks, queues, and primitives
             # These will be used for map_inputs
             ranklist = range(mapsize)
@@ -374,7 +415,7 @@ class MultiprocessingEngine(Engine):
             # Apply the inputs to the worker function using parallel map
             # Results can be printed for output from the worker tasks
             results = pool.map(worker, map_inputs)
-        
+
             # Get the outputs from the output queue and save as new inputs
             inputs = []
             while not oq.empty():
@@ -400,14 +441,11 @@ class MultiprocessingEngine(Engine):
     
 mp_engine = MultiprocessingEngine()
 
-
-
 # Set the Config.engine as the default
 
-Config.engine = pass_engine
 Config.engine = tile_engine
+Config.engine = pass_engine
 Config.engine = mp_engine
-
 
 print("Default engine",Config.engine)
 

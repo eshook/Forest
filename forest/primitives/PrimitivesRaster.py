@@ -120,6 +120,24 @@ FocalMinimum = RMap("FocalMinimum",np.amin,buffersize=1)
 
 
 
+def _Raster_add(self,right):
+    return LocalSum(self,right)
+
+def _Raster_sub(self,right):
+    return LocalSub(self,right)
+
+def _Raster_div(self,right):
+    return LocalDivide(self,right)
+
+def _Raster_mul(self,right):
+    return LocalMultiply(self,right)
+    
+# Overload Raster with new operators
+Raster.__add__ = _Raster_add
+Raster.__sub__ = _Raster_sub
+Raster.__mul__ = _Raster_mul
+Raster.__truediv__ = _Raster_div
+    
 
 
 # Create a number of local and focal primitives
