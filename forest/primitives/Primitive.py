@@ -31,6 +31,12 @@ class Primitive(object):
         Config.engine.run(self)
         return right
 
+    def __ne__(self, right):
+        print(self, "!= (Synchronization)", right)
+        Config.engine.run(self)
+        Config.engine.synchronization(Config.inputs)
+        return right
+
     def __gt__(self, right):
         print(self, "> (Merge)", right)
         Config.engine.run(self)

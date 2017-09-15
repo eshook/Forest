@@ -142,7 +142,7 @@ class ShapefileReadPrim(Primitive):
         vector = Vector(miny,minx,maxy-miny,maxx-minx,None,None)
         vector.geom_types = geom_types
         vector.sr = spatialReference
-        vector.setLayer(newlayer)
+        vector.data = newlayer
         return vector
 
     def reg(self, filename):
@@ -192,6 +192,7 @@ class ShapefileNewReadPrim(Primitive):
 ShapefileNewRead = ShapefileNewReadPrim()
         
 
+# FIXME: Rename GeotiffRead to RasterTileRead
 class GeotiffReadPrim(Primitive):
     def __init__(self):
         # Call the __init__ for Primitive  

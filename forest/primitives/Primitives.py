@@ -118,7 +118,7 @@ class PartialSumRasterizePrim(Primitive):
         # Call the __init__ for Primitive  
         super(PartialSumRasterizePrim,self).__init__("PartialSumRasterize")
 
-    def __call__(self, zone = None, data = None):
+    def __call__(self, zone = None, data = None, properties_name = None):
 
         #arr = np.zeros((data.nrows,data.ncols))
         
@@ -157,6 +157,13 @@ class PartialSumRasterizePrim(Primitive):
             shapes.append([ f['geometry'],f['properties']['STATEFP'] ])
         
         #shapes = ((geom,value) for geom, value in zip(zone.data[])
+
+        # New way, more generic # FIXME: Return to this
+        properties_name = 'STATEFP' # or 'geoid'
+        
+        # Create zoneshapes, which is the geometry + state FP
+        # zoneshapes = ((f['geometry'],int(f['properties'][properties_name])) for f in zone.data)
+        # arr = rasterio.features.rasterize(shapes = zoneshapes, out_shape=data.data.shape, transform = transform)
         
         zoneshapes = ((f['geometry'],f['properties']['STATEFP']) for f in zone.data)
         

@@ -35,29 +35,43 @@ class Raster(Bob):
         # FIXME: FIXED DATATYPE RIGHT NOW
         self.datatype = "Float" 
         
+        # FIXME: Make this optional in the future (with a flag)
         # Create a zero raster array
         self.data = np.zeros((self.nrows,self.ncols))
+        
+        # FIXME: Sanity check h/w with nrows/ncols * cellsize
+        # either reset Bob or print warning (flag?)
 
     def get_data(self, r, c, rh, cw):
         # Remember, the array is upside down in GIS
         # So when we take a slice, we must do it from the bottom
         # which is why we are subtracting r/rh from nrows
         return self.data[self.nrows-(r+rh):self.nrows-r,c:c+cw]
-        
-        
+
+    # Generator that loops over the raster data
+    # and returns the r, c for each element  
+    def iterrc(self):
+        for r in range(self.nrows):
+            for c in range(self.ncols):
+                yield r,c
+    
+    # Generator that loops over the raster data
+    # and returns the r,c for each element BUT DOES NOT INCLUDE
+    # a buffered area along the edge of the raster defined by buffersize
+    def iterrcbuffer(self,buffersize):
+        for r in range(buffersize,self.nrows-buffersize):
+                for c in range(buffersize,self.ncols-buffersize):
+                    yield r,c
+    
 # Vector Layer Bob
 class Vector(Bob):        
     def __init__(self,y = 0, x = 0, h = 10, w = 10, s = 0, d = 0):
         super(Vector,self).__init__(y,x,h,w,s,d)
         
         self.sr = None
-        #self.layer = None
         self.geom_types = [] # The geometry types the VBob holds.
         
     
-    def setLayer(self,layer): # should we allow multi-layer Vector Bobs? YES 
-        self.data = layer
-     
     def getFeature(self,fid):
         return self.data[fid]
     
@@ -88,3 +102,37 @@ class KeyValue(Bob):
         # Make an empty dictionary for key-values
         self.data = {}
 
+
+# Bob to store a stack of rasters arranged as a space-time cube (STCube)
+# Originally authored by Jacob Arndt
+class STCube(Bob):
+    
+    def __init__(self,y = 0, x = 0, h = 10, w = 10, s = 0, d = 0):
+        super(STCube,self).__init__(y,x,h,w,s,d)
+        
+        self.srid = None
+        self.missing_value = None
+        
+        self.cellwidth = None
+        self.cellheight = None
+        self.nrows = None 
+        self.ncols = None
+         
+        self.e = None
+        self.temres = None
+        self.timelist = None
+        
+        self.globalattributes = None
+        self.variableattributes = None
+        self.dimensionattributes = None
+        
+    def setdata(self,data):
+        self.data = data
+        self.nlayers = len(self.data)
+        self.nrows = len(self.data[0])
+        self.ncols = len(self.data[0][0])
+
+    def getTimeList(self):
+        return self.timelist
+        
+    
