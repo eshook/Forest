@@ -268,15 +268,21 @@ class NearRepeatPrim(Primitive):
         #Boundary calculation,since we have overlapping spatio temporal halo zones we have to avoid duplication
         for i in xrange(len(bob.halo)):
             for j in xrange(len(bob.data)):
-                #we won't calculate interactions between back halo zone and the neighboring bob slice to avoid duplication
-                if (bob.data[j]['x']>=bob.x and bob.data[j]['x']<bob.x+maxdistance and bob.data[j]['y']>=bob.y and bob.data[j]['y']<bob.y+maxdistance and bob.data[j]['t']>=bob.s and bob.data[j]['t']<bob.s+maxtime) and (bob.halo[i]['x']>=bob.x-maxdistance and bob.halo[i]['x']<bob.x and bob.halo[i]['y']>=bob.y-maxdistance and bob.halo[i]['y']<bob.y and bob.halo[i]['t']>=bob.s-maxtime and bob.data[i]['t']<bob.s):
-                    continue
-                timeshift=bob.data[j]['t']-bob.halo[i]['t']
-                distanceshift= np.linalg.norm(np.asarray([bob.data[j]['x'],bob.data[j]['y']])-np.asarray([bob.halo[i]['x'],bob.halo[i]['y']]), 2, 0)
-                for ranges in out_kv.data:
-                    timerange,distancerange=long(ranges.split('-')[0]),int(ranges.split('-')[1])
-                    if timeshift>=timerange and timeshift<timerange+timeinterval and distanceshift>=distancerange and distanceshift<distancerange+distanceinterval:
-                        out_kv.data[ranges]['cnt']+=1
+                calculate=False
+                #if the bob data is not from the halozone, then we could directly use it for calculations
+                if bob.data[j]['x']>=bob.x+maxdistance and bob.data[j]['x']<bob.x+bob.w-maxdistance and bob.data[j]['y']>=bob.y+maxdistance and bob.data[j]['y']<bob.y+bob.h-maxdistance and bob.data[j]['t']>=bob.s+maxtime and bob.data[j]['t']<bob.s+bob.d-maxtime:
+                    calculate=True
+                #if the bob data is from an internal halo zone we only calculate the forward halozone positions 
+                else:
+                    if bob.halo[i]['x']>=bob.x and bob.halo[i]['x']<bob.x+bob.w+maxdistance and bob.halo[i]['y']>=bob.y and bob.halo[i]['y']<bob.y+bob.h+maxdistance and bob.halo[i]['t']>=bob.s and bob.halo[i]['t']<bob.s+bob.d+maxtime:
+                        calculate=True
+                if calculate:
+                    timeshift=bob.data[j]['t']-bob.halo[i]['t']
+                    distanceshift= np.linalg.norm(np.asarray([bob.data[j]['x'],bob.data[j]['y']])-np.asarray([bob.halo[i]['x'],bob.halo[i]['y']]), 2, 0)
+                    for ranges in out_kv.data:
+                        timerange,distancerange=long(ranges.split('-')[0]),int(ranges.split('-')[1])
+                        if timeshift>=timerange and timeshift<timerange+timeinterval and distanceshift>=distancerange and distanceshift<distancerange+distanceinterval:
+                            out_kv.data[ranges]['cnt']+=1
         return out_kv
     
 NearRepeat = NearRepeatPrim()

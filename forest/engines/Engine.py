@@ -145,11 +145,14 @@ class TileEngine(Engine):
                     yranges=np.linspace(bob.y, bob.y+bob.h, num=num_tiles+1,endpoint=True)
                     tranges=np.linspace(bob.s, bob.s+bob.d, num=num_tiles+1,endpoint=True,dtype=np.int64)
                     boxwidth,boxheight,boxduration=xranges[1]-xranges[0],yranges[1]-yranges[0],tranges[1]-tranges[0]
+                    #create the boxes
                     for i in xrange(len(xranges)-1):
-                        #buffer will be used during data addition
-                        box=STPoint(yranges[i],xranges[i], boxheight, boxwidth, tranges[i], boxduration)
-                        box.data=[]
-                        tiles.append(box)
+                        for j in xrange(len(yranges)-1):
+                            for k in xrange(len(tranges)-1):
+                                #buffer will be used during data addition
+                                box=STPoint(yranges[j],xranges[i], boxheight, boxwidth, tranges[k], boxduration)
+                                box.data=[]
+                                tiles.append(box)
                     #This should be done in parallel, distribute the bob array, and boxes to cores, and finally merge to get filled bobs
                     for d in bob.data:
                         for box in tiles:
@@ -170,11 +173,13 @@ class TileEngine(Engine):
                     xranges=np.linspace(bob.x, bob.x+bob.w, num=num_tiles+1,endpoint=True)
                     yranges=np.linspace(bob.y, bob.y+bob.h, num=num_tiles+1,endpoint=True)
                     boxwidth,boxheight=xranges[1]-xranges[0],yranges[1]-yranges[0]
+                    #create the split boxes
                     for i in xrange(len(xranges)-1):
-                        #buffer will be used during data addition
-                        box=Point(yranges[i],xranges[i], boxheight, boxwidth, 0,0)
-                        box.data=[]
-                        tiles.append(box)
+                        for j in xrange(len(yranges)-1):
+                            #buffer will be used during data addition
+                            box=Point(yranges[j],xranges[i], boxheight, boxwidth, 0,0)
+                            box.data=[]
+                            tiles.append(box)
                     #This should be done in parallel, distribute the bob array, and boxes to cores, and finally merge to get filled bobs
                     for d in bob.data:
                         for box in tiles:
