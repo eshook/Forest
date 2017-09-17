@@ -2,7 +2,7 @@
 Copyright (c) 2017 Eric Shook. All rights reserved.
 Use of this source code is governed by a BSD-style license that can be found in the LICENSE file.
 @author: eshook (Eric Shook, eshook@gmail.edu)
-@contributors: (Jacob Arndt, arndt204@umn.edu; )
+@contributors: (Jacob Arndt, arndt204@umn.edu; Luyi Hunter, chen3461@umn.edu; Xinran Duan, duanx138@umn.edu)
 """
 
 # FIXME: We need to have conditional imports here eventually
@@ -206,7 +206,7 @@ class GeotiffReadPrim(Primitive):
         
     
     # FIXME: inbob is temporary for now, to solve a passthrough issue. Need to fix.
-    def __call__(self, inbob = None, filename = None, bandnumber = 1):
+    def __call__(self, inbob = None, filename = None, bandnumber = 1, paralell = False):
 
         if filename is not None:
             self.filename = filename        
@@ -220,7 +220,8 @@ class GeotiffReadPrim(Primitive):
         ncols = ds.RasterXSize
         nrows = ds.RasterYSize
 
-        
+        # nrows = 10000
+
         if band is None:
             print("Cannot read selected band in "+filename+" in ReadGeoTIFF")
             raise(Exception)
@@ -240,17 +241,28 @@ class GeotiffReadPrim(Primitive):
         h=float(nrows)*cellsize
         w=float(ncols)*cellsize
         layer=Raster(y,x,h,w,None,None,nrows,ncols,cellsize)
-        nparr=band.ReadAsArray(0,0,ncols,nrows) 
-        layer.data = nparr
-        #set_nparray(nparr,cellsize,nodata_value)
-    
+        
+        ######################################################
+        ## Enable paralell processing
+        paralell = True 
+        if paralell == False:
+            nparr=band.ReadAsArray(0,0,ncols,nrows) 
+            layer.data = nparr
+        layer.filename = self.filename
+        layer.nodatavalue = nodata_value
+        ######################################################
+        # set_nparray(nparr,cellsize,nodata_value)
         del transform
-        del nparr
         del band
         del ds
-        nparr=None
-        ds=None # Close gdal dataset
+        transform=None
+        ds=None 
         band=None
+        ######################################################
+        if paralell == False:
+            del nparr
+            nparr=None
+        ######################################################
     
         return layer
 
@@ -260,6 +272,7 @@ class GeotiffReadPrim(Primitive):
         return self
     
 GeotiffRead = GeotiffReadPrim()    
+
 
 #Primitive to read a CSV file and generate 2D point or Spatio-temporal point layer
 class CsvReadPrim(Primitive):
@@ -338,3 +351,4 @@ class CsvReadPrim(Primitive):
         return self
 
 CsvRead=CsvReadPrim()    
+

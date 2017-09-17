@@ -2,7 +2,8 @@
 Copyright (c) 2017 Eric Shook. All rights reserved.
 Use of this source code is governed by a BSD-style license that can be found in the LICENSE file.
 @author: eshook (Eric Shook, eshook@gmail.edu)
-@contributors: <Contribute and add your name here!>
+@contributors: (Luyi Hunter, chen3461@umn.edu; Xinran Duan, duanx138@umn.edu)
+ @contributors: <Contribute and add your name here!>
 """
 
 # This is a global variable that allows the outputs from one interop 
@@ -17,3 +18,5 @@ flows = {}
 # to control which computational engine is used
 # When set to pass_engine, the pattern operators (< > !=) do nothing.
 engine = None
+n_tile = 20
+n_core = 4
