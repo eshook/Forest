@@ -384,9 +384,9 @@ class NearRepeatPrim(Primitive):
         for i in xrange(len(bob.halo)):
             for j in xrange(len(bob.data)):
                 calculate=False
-                #if the bob data is not from the halozone, then we could directly use it for calculations
-                if bob.data[j]['x']>=bob.x+maxdistance and bob.data[j]['x']<bob.x+bob.w-maxdistance and bob.data[j]['y']>=bob.y+maxdistance and bob.data[j]['y']<bob.y+bob.h-maxdistance and bob.data[j]['t']>=bob.s+maxtime and bob.data[j]['t']<bob.s+bob.d-maxtime:
-                    calculate=True
+                #if the bob data is not from the interior halozone, then we could ignore it
+                if bob.data[j]['x']>=(bob.x+maxdistance) and bob.data[j]['x']<(bob.x+bob.w-maxdistance) and bob.data[j]['y']>=(bob.y+maxdistance) and bob.data[j]['y']<(bob.y+bob.h-maxdistance) and bob.data[j]['t']>=(bob.s+maxtime) and bob.data[j]['t']<(bob.s+bob.d-maxtime):
+                    calculate=False
                 #if the bob data is from an internal halo zone we only calculate the forward halozone positions 
                 else:
                     if bob.halo[i]['x']>=bob.x and bob.halo[i]['x']<bob.x+bob.w+maxdistance and bob.halo[i]['y']>=bob.y and bob.halo[i]['y']<bob.y+bob.h+maxdistance and bob.halo[i]['t']>=bob.s and bob.halo[i]['t']<bob.s+bob.d+maxtime:
