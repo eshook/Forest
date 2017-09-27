@@ -97,7 +97,7 @@ class ShapefileReadPrim(Primitive):
         # Set passthrough to True so that data is passed through
         self.passthrough = True
         
-    def __call__(self, filename = None):    
+    def __call__(self, filename = None, others = None):    
             
         driver = ogr.GetDriverByName("ESRI Shapefile")
         dataSource = driver.Open(filename, 0)
@@ -126,6 +126,16 @@ class ShapefileReadPrim(Primitive):
             fieldWidth = layerDefinition.GetFieldDefn(field).GetWidth()
             fieldPrecision = layerDefinition.GetFieldDefn(field).GetPrecision()
             fieldInfo[fieldName] = [fieldType,fieldWidth,fieldPrecision]
+
+        #Right now, manually finding the boundaries of the BOB. Need to see where
+        #these values are stored inside of the shapefile and just access them there
+        #Mckenzie
+        miny = float('inf')
+        minx = float('inf')
+        maxy = float('-inf')
+        maxx = float('-inf')
+        mins = float('inf')
+        maxs = float('-inf')
             
         """Iterate through all features in the layer, getting their feature IDs, geometry, and attribute info.
         Write that information into the newLayer"""
@@ -135,18 +145,47 @@ class ShapefileReadPrim(Primitive):
             FID = feature.GetFID()
             stringGeom = feature.GetGeometryRef().ExportToJson() #This export doesn't use tuples so this might not be the best idea. Tuples offer faster indexing.
             geom = json.loads(stringGeom) # convert the string representation of a dictionary to a real dictionary
+
+            #Finds the boundary coordinates for the vector
+            if geom["coordinates"][0] < minx:
+                minx = geom["coordinates"][0]
+            elif geom["coordinates"][0] > maxx:
+                maxx = geom["coordinates"][0]
+
+            if geom["coordinates"][1] < miny:
+                miny = geom["coordinates"][1]
+            elif geom["coordinates"][1] > maxy:
+                maxy = geom["coordinates"][1]
+
+            if "time" in attributes:
+                if attributes["time"] > maxs:
+                    maxs = attributes["time"]
+                elif attributes["time"] < mins:
+                    mins = attributes["time"]
+
+
             if geom['type'] not in geom_types:
                 geom_types.append(geom['type'])
             attributes = OrderedDict()
             for key in fieldInfo.keys():
                 attributes[key] = feature.GetField(key)
             newlayer[FID] = {"type": "Feature", "geometry": geom, "id": FID, "attributes": attributes}
-        
-        vector = Vector(miny,minx,maxy-miny,maxx-minx,None,None)
+
+        #Checks if the shapefile contained any information on time (what is the
+        #standard attribute name for time attributes? Is there one?)
+        if "time" in newlayer[0]["attributes"]:
+            vector = Vector(miny,minx,maxy-miny,maxx-minx,mins,maxs-mins)
+        else:
+            vector = Vector(miny,minx,maxy-miny,maxx-minx,None,None)
+            
         vector.geom_types = geom_types
         vector.sr = spatialReference
         vector.data = newlayer
-        return vector
+        #Currently returns others in order to create better data flow throughout
+        #the primitives. Should all data be passed between primitives, or is there
+        #a central location to "put" objects, and how would a primitive know
+        #which data sets to grab?
+        return [vector, others]
 
     def reg(self, filename):
         print(self.name,"register")
@@ -352,3 +391,47 @@ class CsvReadPrim(Primitive):
 
 CsvRead=CsvReadPrim()    
 
+
+#Primitive used to create .tif files to store output data in
+#Mckenzie Ebert
+class GeotiffWritePrim(Primitive):
+
+    def __init__(self):
+        super(GeotiffWritePrim, self).__init__("GeoTIFF Write Prim")
+        self.name = "GeoTIFF Write Primitive"
+
+
+    def __call__(self, rasterBob, spatialReference, filePath = None):
+        
+        #File will be saved to current working directory if no file path is defined
+        if filePath == None:
+            filePath = str(os.getcwd())+"/TestResults"
+
+        #Adds the name of the file to be created to the file path
+        filePath = filePath + "/Results" + str(time.strftime("%m")) + "-" + str(time.strftime("%d"))+".tif"
+        driver = gdal.GetDriverByName('GTiff') #Obtains the GeoTIFF Driver
+
+        #Creates a new .tif file at the indicated file path, with an xSize of w and a ySize of h
+        newGTiff = driver.Create(filePath, rasterBob.ncols, rasterBob.nrows, 1, gdal.GDT_Float32)
+        band = newGTiff.GetRasterBand(1)
+        band.WriteArray(rasterBob.data) #Writes the data from the raster to the new .tif file
+        band.SetNoDataValue(-1) #Can be changed to whatever value fits the circumstance (still need to decide on the default value)
+        
+
+        #Sets up the GeoTransform and the Projection for the file
+        xRes = rasterBob.w/float(rasterBob.ncols)
+        yRes = rasterBob.h/float(rasterBob.nrows)
+        geoTransform = (rasterBob.x, xRes, 0, rasterBob.y, 0, yRes)
+
+        newGTiff.SetGeoTransform(geoTransform)
+        newGTiff.SetProjection(spatialReference.ExportToWkt())
+
+        band.FlushCache() #'Saves' the data written to the file
+
+        #Closes out the file and raster band
+        band = None
+        newGTiff = None
+        
+        return
+
+GeotiffWrite = GeotiffWritePrim()

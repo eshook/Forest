@@ -62,6 +62,14 @@ class Raster(Bob):
         for r in range(buffersize,self.nrows-buffersize):
                 for c in range(buffersize,self.ncols-buffersize):
                     yield r,c
+
+    #Obtains the spatial coordinates given
+    #a row and column number, and the size of the raster cells
+    #Mckenzie Ebert
+    def findCellCenter(self, row, column):
+        y = self.y + (row*self.cellsize + self.cellsize/2)
+        x = self.x + (column*self.cellsize + self.cellsize/2)
+        return y, x
     
 # Vector Layer Bob
 class Vector(Bob):        
@@ -91,6 +99,24 @@ class Vector(Bob):
     
     def getFeatureCount(self):
         return len(self.data)
+
+    #For use in creating KDTrees from vector type data
+    #This needs to be optimized, or a better way of converting needs to be looked
+    #into, as this currently eats up processing times. Mckenzie Ebert
+    def getPointListVals(self, attributeName):
+        #Set up a check that makes sure self.geom_types only contains points
+        pointList = []
+        pointValues = []
+        for point in self.data:
+            pointCoords = self.data[point]["geometry"]["coordinates"]
+            pointVal = self.data[point]["attributes"][attributeName]
+
+            pointList.append(pointCoords)
+            pointValues.append(pointVal)
+
+        #Returns a list with point coordinates and another list
+        #with corresponding indexes that hold point values for the specified attribute
+        return pointList, pointValues
   
         
 # Bob to store Key-Value Pairs        
