@@ -20,6 +20,7 @@ class setUpPrim(Primitive):
         attributeName = others[1]
         searchRadius = others[2]
         filePath = others[3]
+        
         blankRaster = Raster(values.y, values.x, values.h, values.w, 0, 0, int(values.h/cellSize), int(values.w/cellSize), cellSize)
         return [blankRaster, values, attributeName, searchRadius, filePath]
 
@@ -60,9 +61,9 @@ class partialIDW(Primitive):
     #In regards to splitting values - currently the primitive is set up to take in
     #a raster that only covers a part of the total spatial area of the data. The primitive
     #will then treat this raster as the full raster, and calculations will go from there
-    def __call__(self, raster, values, attributeName, searchRadius, filePath, power = 2):
+    def __call__(self, raster, values, attrName, searchRadius, filePath, power = 2):
         #Placing the vector data into an array format in order to sort into a KDTree data structure
-        pointList, pointValues = points.getPointListVals(attrName)
+        pointList, pointValues = values.getPointListVals(attrName)
         pointTree = sp.KDTree(pointList)
 
         #Built in row and column generator in the Raster class
@@ -97,7 +98,7 @@ class IDW(Pattern):
     def __call__(self, dataFileName, cellSize, attributeName, searchRadius, filePath = None):
         
         print("Running", self.__class__.__name__)
-        Config.inputs = [dataFileName, [cellSize, attributeName, filePath]]
+        Config.inputs = [dataFileName, [cellSize, attributeName, searchRadius, filePath]]
         output = run_primitive(ShapefileRead == setUp < partIDW > GeotiffWrite)
        
         return output
