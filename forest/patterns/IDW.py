@@ -76,7 +76,7 @@ class partialIDW(Primitive):
             #Normal IDW calculations
             weightedSum = 0.0
             totalWeight = 0.0
-            for dataPoint in pointsInRadius:
+            for point in pointsInRadius:
                 
                 distance = ((xVal-pointList[point][0])**2+(yVal-pointList[point][1])**2)**(0.5)
                 weight = 1.0 / distance**power
