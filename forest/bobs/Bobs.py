@@ -121,25 +121,24 @@ class Vector(Bob):
     #Used when getting Space-Time Point List values
     def getSTCPoints(self, attributeName):
         pointList = []
-        pointValues = [[],[]]
+        pointValues = []
         timeList = []
 
         for point in self.data:
             pointCoords = [self.data[point]["geometry"]["coordinates"][0], self.data[point]["geometry"]["coordinates"][1]]
-            pointVal = [self.data[point]["attributes"][attributeName],self.data[point]["geometry"]["coordinates"][2]] 
+            #There needs to be a global name for the time attribute, as well as a global format. Maybe something to look into for I/O?
+            pointVal = [self.data[point]["attributes"][attributeName],self.data[point]["attributes"]["time"]] 
             if pointVal[1] not in timeList:
                 timeList.append(pointVal[1])
 
             pointList.append(pointCoords)
-            pointValues[0].append(pointVal)
-            pointValues[1].append(timeVal)
+            pointValues.append(pointVal)
 
         #Is this truly needed? Do the time values need to be in sequential order for calculations?
         timeList.sort()
 
         #Returns a point list containing the x and y coordinates, and
-        #a pointValues list which contains two sublists - one containing the attribute
-        #values and the other containing the times each point was measured at
+        #a pointValues list which contains the attribute value and the corresponding time value for that point
         return pointList, pointValues, timeList
   
         
