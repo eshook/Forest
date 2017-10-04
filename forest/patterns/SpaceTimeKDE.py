@@ -29,6 +29,31 @@ class rearrangeData(Primitive):
 setUp = rearrangeData("Set Up Data")
 
 
+
+#Classic version of Space-Time KDE
+class classicPartialSTKDE(Primitive):
+
+    def __call__(self, points, partialSTC, searchRadius, timeGap):
+
+        for time in range(len(partailSTC.data)):
+            for row in range(len(partialSTC.data[time])):
+                for column in range(len(partialSTC.data[time][row])):
+                    yVal, xVal = partialSTC.findCellCenter(row, column)  
+
+                    for point in points.data:
+                        timeStamp = points.data[point]["attributes"]["time"]
+                        if timeStamp in range(time - timeGap, time+1):
+                            distance = ((points.data[point]["geometry"]["coordinates"][0]-xVal)**2+(points.data[point]["geometry"]["coordinates"][1]-yVal)**2)**0.5
+                            
+                            if distance <= searchRadius:
+                                partialSTC.data[timeInt][row][column] += points.data[point]["attributes"][attrName] * (1 - distance/searchRadius)
+                   
+        return [partialSTC]
+
+classicSTKDE = classicPartialSTKDE("Partial KDE")
+
+
+
 #Assumes points is a STCube BOB data structure
 class partialSTKDE(Primitive):
 
