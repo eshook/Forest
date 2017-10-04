@@ -190,6 +190,11 @@ class STCube(Bob):
             x = self.x + (column*self.cellheight + self.cellheight/2)
             t = self.s + (time*self.cellwidth + self.cellwidth/2)
             return y, x, t
+
+    def iterrc(self):
+        for r in range(self.nrows):
+            for c in range(self.ncols):
+                yield r, c
         
 
 #2D point layer
