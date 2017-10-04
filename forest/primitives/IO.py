@@ -436,8 +436,9 @@ class GeotiffWritePrim(Primitive):
 
 GeotiffWrite = GeotiffWritePrim()
 
-#Edited from the original CsvReadPrim in order to get a Space Time Cube BOB - is there a better way to optimize for this type of BOB? Or does this work?
-class CsvSTCReadPrim(Primitive):
+#Edited from the original CsvReadPrim to create a list of points and data/atrributes that will make creating a KDTree for STCs easier
+#Should this be used to create an STCube automatically? Or should that be done in a separate Primitive?
+class CsvReadNewPrim(Primitive):
     def __init__(self):
         
         # Call the __init__ for Primitive  
@@ -446,7 +447,7 @@ class CsvSTCReadPrim(Primitive):
         # Set passthrough to True so that data is passed through
         self.passthrough = True
         
-    def __call__(self, filename = None):
+    def __call__(self, filename = None, attrName = None, others = None):
         if filename is not None:
             self.filename=filename
         with open(self.filename) as csvfile:
@@ -463,15 +464,15 @@ class CsvSTCReadPrim(Primitive):
             minx,miny=np.inf,np.inf
             maxx,maxy=np.NINF,np.NINF
             mint,maxt=np.inf,np.NINF
-            data=[]
-            isspatiotemporal=False
+            points=[]
+            values=[]
+            timelist=[]
             for row in reader:
                 #this mapping should come from global parameters
                 lat,lon=float(row['y']),float(row['x'])
                 timeval=None
                 #this mapping should come from global parameters
-                if 't' in row:
-                    timeval=row['t']
+                timeval=row['t']
                 point = ogr.Geometry(ogr.wkbPoint)
                 point.AddPoint(lon,lat)
                 point.Transform(transform)
@@ -483,36 +484,34 @@ class CsvSTCReadPrim(Primitive):
                     maxx=point.GetX()
                 if point.GetY()>maxy:
                     maxy=point.GetY()
-                pointdat={}
-                pointdat['x']=point.GetX()
-                pointdat['y']=point.GetY()
-                if timeval is not None:
-                    #parse to handle lot of time formats
-                    timedat=parse(timeval, fuzzy=True)
-                    #time should be in milli for easier calculations
-                    timeinfo=long(time.mktime(timedat.timetuple())*1000 + timedat.microsecond/1000)
-                    if timeinfo<mint:
-                        mint=timeinfo
-                    if timeinfo>maxt:
-                        maxt=timeinfo
-                    pointdat['t']=timeinfo
-                    isspatiotemporal=True
-                data.append(pointdat)
+                points.append([point.GetX(), point.GetY()])
+                
+                #parse to handle lot of time formats
+                timedat=parse(timeval, fuzzy=True)
+                #time should be in milli for easier calculations
+                timeinfo=long(time.mktime(timedat.timetuple())*1000 + timedat.microsecond/1000)
+                if timeinfo<mint:
+                    mint=timeinfo
+                if timeinfo>maxt:
+                    maxt=timeinfo
+                values.append([timeinfo, row[attrName]])
+                timelist.append(timeinfo)
+                
+                
+        #The data for this STCube is incorretly formatted as a pointList, this needs to be fixed/redone
+        #Was hard coded for testing purposes                
         y,x,h,w,s,d = miny,minx,maxy-miny,maxx-minx,mint,maxt-mint
-        layer=None
-        if isspatiotemporal:
-            layer=STPoint(y,x,h,w,s,d)
-        else:
-            layer=Point(y,x,h,w,s,d)
-        layer.data=data
-        return layer
+        STC= STCube(y, x, h, w, s, d)
+        STC.setdata([points, values])
+        STC.timelist = timelist
+        return [STC, others]
     
     def reg(self, filename):
         print(self.name,"register")
         self.filename = filename
         return self
 
-CsvSTCRead=CsvSTCReadPrim()
+CsvNewRead=CsvReadNewPrim()
 
 
 class GeoTIFFMultiWriter(Primitive):
