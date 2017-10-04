@@ -161,6 +161,30 @@ class STCube(Bob):
     def getTimeList(self):
         return self.timelist
 
+    def getPointListVals(self):
+        pointList = []
+        pointData = []
+
+        for time in range(self.nlayers):
+            for row in range(self.nrows):
+                for column in range(self.ncols):
+
+                    pointData.append([self.data[time][row][column], self.timelist[time]])
+                    pointList.append([row, column])
+
+
+    def findCellCenter(self, row, column, time=None):
+        if time == None:
+            y = self.y + (row*self.cellheight + self.cellheight/2)
+            x = self.x + (column*self.cellheight + self.cellheight/2)
+            return y, x
+        else:
+            y = self.y + (row*self.cellheight + self.cellheight/2)
+            x = self.x + (column*self.cellheight + self.cellheight/2)
+            t = self.s + (time*self.cellwidth + self.cellwidth/2)
+            return y, x, t
+        
+
 #2D point layer
 class Point(Vector):
     def __init__(self,y = 0, x = 0, h = 10, w = 10, s = 0, d = 0):

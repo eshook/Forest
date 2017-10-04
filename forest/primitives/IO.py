@@ -435,3 +435,81 @@ class GeotiffWritePrim(Primitive):
         return
 
 GeotiffWrite = GeotiffWritePrim()
+
+#Edited from the original CsvReadPrim in order to get a Space Time Cube BOB - is there a better way to optimize for this type of BOB? Or does this work?
+class CsvSTCReadPrim(Primitive):
+    def __init__(self):
+        
+        # Call the __init__ for Primitive  
+        super(CsvSTCReadPrim,self).__init__("CsvSTCRead")
+
+        # Set passthrough to True so that data is passed through
+        self.passthrough = True
+        
+    def __call__(self, filename = None):
+        if filename is not None:
+            self.filename=filename
+        with open(self.filename) as csvfile:
+            # we need coordinates in meters for distance based calculations and decomposition
+            source = osr.SpatialReference()
+            #always expecting data to be un-projected
+            source.ImportFromEPSG(4326)
+            target = osr.SpatialReference()
+            #web mercator projection in meters
+            target.ImportFromEPSG(3857)
+            transform = osr.CoordinateTransformation(source,target)
+            reader = csv.DictReader(csvfile)
+            #for calculating bounds
+            minx,miny=np.inf,np.inf
+            maxx,maxy=np.NINF,np.NINF
+            mint,maxt=np.inf,np.NINF
+            data=[]
+            isspatiotemporal=False
+            for row in reader:
+                #this mapping should come from global parameters
+                lat,lon=float(row['y']),float(row['x'])
+                timeval=None
+                #this mapping should come from global parameters
+                if 't' in row:
+                    timeval=row['t']
+                point = ogr.Geometry(ogr.wkbPoint)
+                point.AddPoint(lon,lat)
+                point.Transform(transform)
+                if point.GetX()<minx:
+                    minx=point.GetX()
+                if point.GetY()<miny:
+                    miny=point.GetY()
+                if point.GetX()>maxx:
+                    maxx=point.GetX()
+                if point.GetY()>maxy:
+                    maxy=point.GetY()
+                pointdat={}
+                pointdat['x']=point.GetX()
+                pointdat['y']=point.GetY()
+                if timeval is not None:
+                    #parse to handle lot of time formats
+                    timedat=parse(timeval, fuzzy=True)
+                    #time should be in milli for easier calculations
+                    timeinfo=long(time.mktime(timedat.timetuple())*1000 + timedat.microsecond/1000)
+                    if timeinfo<mint:
+                        mint=timeinfo
+                    if timeinfo>maxt:
+                        maxt=timeinfo
+                    pointdat['t']=timeinfo
+                    isspatiotemporal=True
+                data.append(pointdat)
+        y,x,h,w,s,d = miny,minx,maxy-miny,maxx-minx,mint,maxt-mint
+        layer=None
+        if isspatiotemporal:
+            layer=STPoint(y,x,h,w,s,d)
+        else:
+            layer=Point(y,x,h,w,s,d)
+        layer.data=data
+        return layer
+    
+    def reg(self, filename):
+        print(self.name,"register")
+        self.filename = filename
+        return self
+
+CsvSTCRead=CsvSTCReadPrim()
