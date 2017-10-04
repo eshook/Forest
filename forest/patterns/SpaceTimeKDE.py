@@ -62,7 +62,7 @@ STKDE = partialSTKDE()
 class partialSTKDEVector(Primitive):
 
     def __call__(self, points, partialSTC, searchRadius, timeGap, filePath):
-        pointList, pointValues = points.getSTCPoints()
+        pointList, pointValues, timeList = points.getSTCPoints(attrName)
         pointTree = sp.KDTree(pointList)
 
 
