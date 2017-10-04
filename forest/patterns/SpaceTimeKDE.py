@@ -19,18 +19,20 @@ class rearrangeData(Primitive):
         partialSTC.nrows = int(points.h/others[0])
         partialSTC.ncols = int(points.w/others[0])
         partialSTC.cellwidth = others[0]
-        partialSTC.cellheight = points.d/len(points.timelist)
+        #Only applicable if assuming points is a STCube, not a vector
+        #partialSTC.cellheight = points.d/len(points.timelist)
+        #partialSTC.timelist = points.timelist
         partialSTC.setdata()
-        partialSTC.timelist = points.timelist
-
-        return [points, partialSTC, others[1], others[2]]
+        
+        return [points, partialSTC, others[1], others[2], others[3]]
 
 setUp = rearrangeData("Set Up Data")
 
-#Uses the STCube BOB data structure
+
+#Assumes points is a STCube BOB data structure
 class partialSTKDE(Primitive):
 
-    def __call__(self, points, partialSTC, searchRadius, timeGap):
+    def __call__(self, points, partialSTC, searchRadius, timeGap, filePath):
         #We need a better way to convert arrays and vectors into point type lists
         pointList = points.data[0]
         pointValues = points.data[1]
@@ -54,62 +56,45 @@ class partialSTKDE(Primitive):
 
         return [partialSTC, points.sr, filePath]
 
+STKDE = partialSTKDE()
 
-##class partialSTKDEVector(Primitive):
-##
-##    def __call__(self, partialSTC, others):
-##        searchRadius = others[0]
-##        timeGap = others[1]
-##        points = others[2]
-##        
-##        partialSTC = partialSTC[0]
-##
-##        for row in range(len(partialSTC.data)):
-##            for column in range(len(partialSTC.data[row])):
-##                yVal, xVal = partialSTC.findCellCenter(row, column)  
-##
-##
-##                pointList = []
-##                for point in points.data:
-##                    distance = ((points.data[point]["geometry"]["coordinates"][0]-xVal)**2+(points.data[point]["geometry"]["coordinates"][1]-yVal)**2)**0.5
-##
-##                    if distance <= searchRadius:
-##                        pointList.append([points.data[point], distance])
-##
-##                for time in range(len(partialSTC.data[row][column])):
-##                    
-##                
-##                
-##                partialSTC.data[row][column][timeInt] += points.data[point]["attributes"] * (1 - distance/searchRadius)
-##                    
-##
-##
-##
-##
-##'''
-##                for timeInt in range(len(partialSTC.data[row][column])):
-##                    for point in points.data:
-##                        #Is the distance calculated as if the time was the same? Or is is a three dimensional distance calculation?
-##                        if points.data[point]["geometry"]["coordinates"][2] in range(timeInt - timeGap, timeInt+1):
-##                            distance = ((points.data[point]["geometry"]["coordinates"][0]-xVal)**2+(points.data[point]["geometry"]["coordinates"][1]-yVal)**2)**0.5
-##                            
-##                            if distance <= searchRadius:
-##                                partialSTC.data[row][column][timeInt] += points.data[point]["attributes"] * (1 - distance/searchRadius)
-##                   
-##'''
-##
-##        return [partialSTC]
-##
-##STKDEVector = partialSTKDEVector("Partial KDE")
+
+class partialSTKDEVector(Primitive):
+
+    def __call__(self, points, partialSTC, searchRadius, timeGap, filePath):
+        pointList, pointValues = points.getSTCPoints()
+        pointTree = sp.KDTree(pointList)
+
+
+        for row, column in partialSTC.iterrc():
+                yVal, xVal = partialSTC.findCellCenter(row, column)
+
+                pointsInRadius = pointTree.query_ball_point([xVal, yVal], searchRadius)
+
+                for time in range(len(partialSTC.timelist)):
+                timeEnd = partialSTC.timelist[time]+timeGap
+
+                for point in pointsInRadius:
+                    #This is not an inclusive range at the moment, but we need to know the time interval/increasing factor to make it inclusive
+                    if pointData[point][0] in range(time, timeEnd):
+                        distance = ((pointList[point][0]-xVal)**2+(pointList[point][1]-yVal)**2)**0.5
+                        partialSTC.data[time][row][column] += pointValues[point][1] * (1 - distance/searchRadius)
+
+                partialSTC.data[time][row][column] = partialSTC.data[time][row][column]/searchRadius
+                    
+
+        return [partialSTC, points.sr, filePath]
+
+STKDEVector = partialSTKDEVector("Partial KDE")
 
 
 
 class kernelDensityEstimation(Pattern):
 
-    def __call__(self, dataFileName, cellSize, searchRadius, timeGap):
+    def __call__(self, dataFileName, cellSize, searchRadius, timeGap, filePath = None):
 
         print("Running", self.__class__.__name__)
-        Config.inputs = [dataFileName, [cellSize, searchRadius, timeGap]]
+        Config.inputs = [dataFileName, [cellSize, searchRadius, timeGap, filePath]]
         output = run_primitive(CsvNewRead == setUp < STKDE > multiGeoWriter)
  
         return output
