@@ -117,6 +117,30 @@ class Vector(Bob):
         #Returns a list with point coordinates and another list
         #with corresponding indexes that hold point values for the specified attribute
         return pointList, pointValues
+
+    #Used when getting Space-Time Point List values
+    def getSTCPoints(self, attributeName):
+        pointList = []
+        pointValues = [[],[]]
+        timeList = []
+
+        for point in self.data:
+            pointCoords = [self.data[point]["geometry"]["coordinates"][0], self.data[point]["geometry"]["coordinates"][1]]
+            pointVal = [self.data[point]["attributes"][attributeName],self.data[point]["geometry"]["coordinates"][2]] 
+            if pointVal[1] not in timeList:
+                timeList.append(pointVal[1])
+
+            pointList.append(pointCoords)
+            pointValues[0].append(pointVal)
+            pointValues[1].append(timeVal)
+
+        #Is this truly needed? Do the time values need to be in sequential order for calculations?
+        timeList.sort()
+
+        #Returns a point list containing the x and y coordinates, and
+        #a pointValues list which contains two sublists - one containing the attribute
+        #values and the other containing the times each point was measured at
+        return pointList, pointValues, timeList
   
         
 # Bob to store Key-Value Pairs        
