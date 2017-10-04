@@ -36,7 +36,7 @@ class partialSTKDE(Primitive):
         #We need a better way to convert arrays and vectors into point type lists
         pointList = points.data[0]
         pointValues = points.data[1]
-        pointTree = sp.KDTree(pointList)
+        pointTree = sp.cKDTree(pointList)
         
         for row, column in partialSTC.iterc():
             yVal, xVal = partialSTC.findCellCenter(row, column)
@@ -59,6 +59,7 @@ class partialSTKDE(Primitive):
 STKDE = partialSTKDE()
 
 
+#Assumes vector data stucture for points
 class partialSTKDEVector(Primitive):
 
     def __call__(self, points, partialSTC, searchRadius, timeGap, filePath):
@@ -96,7 +97,7 @@ class kernelDensityEstimation(Pattern):
 
         print("Running", self.__class__.__name__)
         Config.inputs = [dataFileName, [cellSize, searchRadius, timeGap, filePath]]
-        output = run_primitive(CsvNewRead == setUp < STKDE > multiGeoWriter)
+        output = run_primitive(ShapefileRead == setUp < STKDEVector > multiGeoWriter)
  
         return output
 
