@@ -64,7 +64,7 @@ class partialIDW(Primitive):
     def __call__(self, raster, values, attrName, searchRadius, filePath, power = 2):
         #Placing the vector data into an array format in order to sort into a KDTree data structure
         pointList, pointValues = values.getPointListVals(attrName)
-        pointTree = sp.KDTree(pointList)
+        pointTree = sp.cKDTree(pointList)
 
         #Built in row and column generator in the Raster class
         for row, column in raster.iterrc():

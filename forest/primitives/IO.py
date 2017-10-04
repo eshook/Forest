@@ -435,3 +435,122 @@ class GeotiffWritePrim(Primitive):
         return
 
 GeotiffWrite = GeotiffWritePrim()
+
+#Edited from the original CsvReadPrim to create a list of points and data/atrributes that will make creating a KDTree for STCs easier
+#Should this be used to create an STCube automatically? Or should that be done in a separate Primitive?
+class CsvReadNewPrim(Primitive):
+    def __init__(self):
+        
+        # Call the __init__ for Primitive  
+        super(CsvSTCReadPrim,self).__init__("CsvSTCRead")
+
+        # Set passthrough to True so that data is passed through
+        self.passthrough = True
+        
+    def __call__(self, filename = None, attrName = None, others = None):
+        if filename is not None:
+            self.filename=filename
+        with open(self.filename) as csvfile:
+            # we need coordinates in meters for distance based calculations and decomposition
+            source = osr.SpatialReference()
+            #always expecting data to be un-projected
+            source.ImportFromEPSG(4326)
+            target = osr.SpatialReference()
+            #web mercator projection in meters
+            target.ImportFromEPSG(3857)
+            transform = osr.CoordinateTransformation(source,target)
+            reader = csv.DictReader(csvfile)
+            #for calculating bounds
+            minx,miny=np.inf,np.inf
+            maxx,maxy=np.NINF,np.NINF
+            mint,maxt=np.inf,np.NINF
+            points=[]
+            values=[]
+            timelist=[]
+            for row in reader:
+                #this mapping should come from global parameters
+                lat,lon=float(row['y']),float(row['x'])
+                timeval=None
+                #this mapping should come from global parameters
+                timeval=row['t']
+                point = ogr.Geometry(ogr.wkbPoint)
+                point.AddPoint(lon,lat)
+                point.Transform(transform)
+                if point.GetX()<minx:
+                    minx=point.GetX()
+                if point.GetY()<miny:
+                    miny=point.GetY()
+                if point.GetX()>maxx:
+                    maxx=point.GetX()
+                if point.GetY()>maxy:
+                    maxy=point.GetY()
+                points.append([point.GetX(), point.GetY()])
+                
+                #parse to handle lot of time formats
+                timedat=parse(timeval, fuzzy=True)
+                #time should be in milli for easier calculations
+                timeinfo=long(time.mktime(timedat.timetuple())*1000 + timedat.microsecond/1000)
+                if timeinfo<mint:
+                    mint=timeinfo
+                if timeinfo>maxt:
+                    maxt=timeinfo
+                values.append([timeinfo, row[attrName]])
+                timelist.append(timeinfo)
+                
+                
+        #The data for this STCube is incorretly formatted as a pointList, this needs to be fixed/redone
+        #Was hard coded for testing purposes                
+        y,x,h,w,s,d = miny,minx,maxy-miny,maxx-minx,mint,maxt-mint
+        STC= STCube(y, x, h, w, s, d)
+        STC.setdata([points, values])
+        STC.timelist = timelist
+        return [STC, others]
+    
+    def reg(self, filename):
+        print(self.name,"register")
+        self.filename = filename
+        return self
+
+CsvNewRead=CsvReadNewPrim()
+
+
+class GeoTIFFMultiWriter(Primitive):
+
+    def __init__(self):
+        super(GeoTIFFMultiWriter, self).__init__("GeoTIFF Multi-Writer")
+        self.name = "GeoTIFF Multi-Writer"
+
+    def __call__(self, STCube, spatialRef, filePath = None):
+        for time in STCube.timelist:
+            
+            #File will be saved to current working directory if no file path is defined
+            if filePath == None:
+                filePath = str(os.getcwd())+"/TestResults-"+str(time)
+
+            #Adds the name of the file to be created to the file path
+            filePath = filePath + "/Results" + str(time.strftime("%m")) + "-" + str(time.strftime("%d"))+"-"+str(time)+".tif"
+            driver = gdal.GetDriverByName('GTiff') #Obtains the GeoTIFF Driver
+
+            #Creates a new .tif file at the indicated file path, with an xSize of w and a ySize of h
+            newGTiff = driver.Create(filePath, rasterBob.ncols, rasterBob.nrows, 1, gdal.GDT_Float32)
+            band = newGTiff.GetRasterBand(1)
+            band.WriteArray(rasterBob.data) #Writes the data from the raster to the new .tif file
+            band.SetNoDataValue(-1) #Can be changed to whatever value fits the circumstance (still need to decide on the default value)
+
+            #Sets up the GeoTransform and the Projection for the file
+            xRes = rasterBob.w/float(rasterBob.ncols)
+            yRes = rasterBob.h/float(rasterBob.nrows)
+            geoTransform = (rasterBob.x, xRes, 0, rasterBob.y, 0, yRes)
+
+            newGTiff.SetGeoTransform(geoTransform)
+            newGTiff.SetProjection(spatialReference.ExportToWkt())
+
+            band.FlushCache() #'Saves' the data written to the file
+
+            #Closes out the file and raster band
+            band = None
+            newGTiff = None
+            
+        return
+
+multiGeoWriter = GeoTIFFMultiWriter()

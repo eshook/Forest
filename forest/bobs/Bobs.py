@@ -117,6 +117,29 @@ class Vector(Bob):
         #Returns a list with point coordinates and another list
         #with corresponding indexes that hold point values for the specified attribute
         return pointList, pointValues
+
+    #Used when getting Space-Time Point List values
+    def getSTCPoints(self, attributeName):
+        pointList = []
+        pointValues = []
+        timeList = []
+
+        for point in self.data:
+            pointCoords = [self.data[point]["geometry"]["coordinates"][0], self.data[point]["geometry"]["coordinates"][1]]
+            #There needs to be a global name for the time attribute, as well as a global format. Maybe something to look into for I/O?
+            pointVal = [self.data[point]["attributes"][attributeName],self.data[point]["attributes"]["time"]] 
+            if pointVal[1] not in timeList:
+                timeList.append(pointVal[1])
+
+            pointList.append(pointCoords)
+            pointValues.append(pointVal)
+
+        #Is this truly needed? Do the time values need to be in sequential order for calculations?
+        timeList.sort()
+
+        #Returns a point list containing the x and y coordinates, and
+        #a pointValues list which contains the attribute value and the corresponding time value for that point
+        return pointList, pointValues, timeList
   
         
 # Bob to store Key-Value Pairs        
@@ -151,15 +174,51 @@ class STCube(Bob):
         self.globalattributes = None
         self.variableattributes = None
         self.dimensionattributes = None
+
+        self.data = None
+
         
-    def setdata(self,data):
-        self.data = data
-        self.nlayers = len(self.data)
-        self.nrows = len(self.data[0])
-        self.ncols = len(self.data[0][0])
+    def setdata(self,data = None):
+        if data==None:
+            for time in range(len(self.timelist)):
+                self.data.append(np.zeros((self.nrows,self.ncols)))
+        else:    
+            self.data = data
+            self.nlayers = len(self.data)
+            self.nrows = len(self.data[0])
+            self.ncols = len(self.data[0][0])
 
     def getTimeList(self):
         return self.timelist
+
+    def getPointListVals(self):
+        pointList = []
+        pointData = []
+
+        for time in range(self.nlayers):
+            for row in range(self.nrows):
+                for column in range(self.ncols):
+
+                    pointData.append([self.data[time][row][column], self.timelist[time]])
+                    pointList.append([row, column])
+
+
+    def findCellCenter(self, row, column, time=None):
+        if time == None:
+            y = self.y + (row*self.cellheight + self.cellheight/2)
+            x = self.x + (column*self.cellheight + self.cellheight/2)
+            return y, x
+        else:
+            y = self.y + (row*self.cellheight + self.cellheight/2)
+            x = self.x + (column*self.cellheight + self.cellheight/2)
+            t = self.s + (time*self.cellwidth + self.cellwidth/2)
+            return y, x, t
+
+    def iterrc(self):
+        for r in range(self.nrows):
+            for c in range(self.ncols):
+                yield r, c
+        
 
 #2D point layer
 class Point(Vector):

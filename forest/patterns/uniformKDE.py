@@ -65,7 +65,7 @@ class partialUniformKDE(Primitive):
     def __call__(self, partialR, points, searchRadius, attrName, filePath):
         #Puts the data points into array format, for easier access and use in the KDTree
         pointList, pointValues = points.getPointListVals(attrName)
-        pointTree = sp.KDTree(pointList)
+        pointTree = sp.cKDTree(pointList)
 
         #Built in Raster class row column generator
         for row, column in partialR.iterrc():
