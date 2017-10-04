@@ -151,12 +151,19 @@ class STCube(Bob):
         self.globalattributes = None
         self.variableattributes = None
         self.dimensionattributes = None
+
+        self.data = None
+
         
-    def setdata(self,data):
-        self.data = data
-        self.nlayers = len(self.data)
-        self.nrows = len(self.data[0])
-        self.ncols = len(self.data[0][0])
+    def setdata(self,data = None):
+        if data==None:
+            for time in range(len(self.timelist)):
+                self.data.append(np.zeros((self.nrows,self.ncols)))
+        else:    
+            self.data = data
+            self.nlayers = len(self.data)
+            self.nrows = len(self.data[0])
+            self.ncols = len(self.data[0][0])
 
     def getTimeList(self):
         return self.timelist
