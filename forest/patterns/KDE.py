@@ -63,7 +63,7 @@ class partialKDE(Primitive):
 
     def __call__(self, partialR, points, searchRadius, attrName, filePath):
         pointList, pointValues = points.getPointListVals(attrName) #Places coordinates and their corresponding values into arrays, to be given to the KDTree for sorting
-        pointTree = sp.KDTree(pointList)
+        pointTree = sp.cKDTree(pointList)
 
         
         for row, column in partialR.iterrc():
