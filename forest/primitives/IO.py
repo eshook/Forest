@@ -513,3 +513,45 @@ class CsvSTCReadPrim(Primitive):
         return self
 
 CsvSTCRead=CsvSTCReadPrim()
+
+
+class GeoTIFFMultiWriter(Primitive):
+
+    def __init__(self):
+        super(GeoTIFFMultiWriter, self).__init__("GeoTIFF Multi-Writer")
+        self.name = "GeoTIFF Multi-Writer"
+
+    def __call__(self, STCube, spatialRef, filePath = None):
+        for time in STCube.timelist:
+            
+            #File will be saved to current working directory if no file path is defined
+            if filePath == None:
+                filePath = str(os.getcwd())+"/TestResults-"+str(time)
+
+            #Adds the name of the file to be created to the file path
+            filePath = filePath + "/Results" + str(time.strftime("%m")) + "-" + str(time.strftime("%d"))+"-"+str(time)+".tif"
+            driver = gdal.GetDriverByName('GTiff') #Obtains the GeoTIFF Driver
+
+            #Creates a new .tif file at the indicated file path, with an xSize of w and a ySize of h
+            newGTiff = driver.Create(filePath, rasterBob.ncols, rasterBob.nrows, 1, gdal.GDT_Float32)
+            band = newGTiff.GetRasterBand(1)
+            band.WriteArray(rasterBob.data) #Writes the data from the raster to the new .tif file
+            band.SetNoDataValue(-1) #Can be changed to whatever value fits the circumstance (still need to decide on the default value)
+
+            #Sets up the GeoTransform and the Projection for the file
+            xRes = rasterBob.w/float(rasterBob.ncols)
+            yRes = rasterBob.h/float(rasterBob.nrows)
+            geoTransform = (rasterBob.x, xRes, 0, rasterBob.y, 0, yRes)
+
+            newGTiff.SetGeoTransform(geoTransform)
+            newGTiff.SetProjection(spatialReference.ExportToWkt())
+
+            band.FlushCache() #'Saves' the data written to the file
+
+            #Closes out the file and raster band
+            band = None
+            newGTiff = None
+            
+        return
+
+multiGeoWriter = GeoTIFFMultiWriter()
