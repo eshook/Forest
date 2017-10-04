@@ -22,7 +22,7 @@ class rearrangeData(Primitive):
         #Only applicable if assuming points is a STCube, not a vector
         #partialSTC.cellheight = points.d/len(points.timelist)
         #partialSTC.timelist = points.timelist
-        partialSTC.setdata()
+        #partialSTC.setdata()
         
         return [points, partialSTC, others[1], others[2], others[3]]
 
@@ -65,7 +65,9 @@ class partialSTKDEVector(Primitive):
     def __call__(self, points, partialSTC, searchRadius, timeGap, filePath):
         pointList, pointValues, timeList = points.getSTCPoints(attrName)
         partialSTC.timelist = timeList
-        pointTree = sp.KDTree(pointList)
+        partialSTC.cellheight = points.d/len(timeList)
+        partialSTC.setdata()
+        pointTree = sp.cKDTree(pointList)
 
 
         for row, column in partialSTC.iterrc():
