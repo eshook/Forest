@@ -401,3 +401,36 @@ class NearRepeatPrim(Primitive):
         return out_kv
     
 NearRepeat = NearRepeatPrim()
+
+
+class vectorToSTCubePrim(Primitive):
+
+    def __init__(self):
+
+        # Call the __init__ for Primitive  
+        super(vectorToSTCubePrim,self).__init__("Vector to STCube")
+
+    def __call__(self, vector, attrName, others):
+
+        stCube = STCube(vector.y, vector.x, vector.h, vector.w, vector.s, vector.d)
+        stCube.srid = vector.sr #Check that this is correct
+
+        coords, values, timeList = vector.getSTCPoints(attrName)
+        stCube.timelist = timeList
+        #Assuming regular time intervals
+        stCube.cellwidth = timeList[1]-timeList[0]
+        
+        for time in timeList:
+            layer = np.zeros(())
+        
+
+
+
+
+
+
+
+
+
+
+        
