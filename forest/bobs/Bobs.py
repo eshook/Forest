@@ -180,6 +180,8 @@ class STCube(Bob):
         
     def setdata(self,data = None):
         if data==None:
+            self.data = []
+            self.nlayers = len(self.timelist)
             for time in range(len(self.timelist)):
                 self.data.append(np.zeros((self.nrows,self.ncols)))
         else:    
@@ -200,7 +202,10 @@ class STCube(Bob):
                 for column in range(self.ncols):
 
                     pointData.append([self.data[time][row][column], self.timelist[time]])
-                    pointList.append([row, column])
+                    y, x = self.findCellCenter(row, column)
+                    pointList.append([x, y])
+
+        return pointList, pointData
 
 
     def findCellCenter(self, row, column, time=None):
