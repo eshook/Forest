@@ -111,6 +111,59 @@ class AveragePrim(Primitive):
         return out_kv
 
 Average = AveragePrim()
+
+#Mckenzie Ebert
+class VectorToSTCubePrim(Primitive):
+
+    def __init__(self):
+        #Call the __init__ for Primitive
+        super(VectorToSTCubePrim, self).__init__("Change Vector BOB into a STCube BOB")
+
+    def __call__(self, vector, attrName, others):
+
+        cellHeight = int(vector.h/1000)
+        cellWidth = int(vector.w/1000)
+        #By putting the points into this format, it is possible to use a KDTree to speed up the cell assigning process for point values
+        pointList, pointValues, timeList = vector.getSTCPoints(attrName)
+        #Setting up initial values and dimensions
+        stCube = STCube(vector.y, vector.x, vector.h, vector.w, vector.s, vector.d)
+        stCube.nrows = 1000
+        stCube.ncols = 1000
+        stCube.cellwidth = cellWidth
+        stCube.cellheight = cellHeight
+        stCube.timelist = timeList
+        stCube.srid = vector.sr
+        stCube.setdata()
+
+        #The maximum distance a point can be away from the center of a raster cell and still be inside the cell
+        maxDist = ((cellWidth/2)**2+(cellHeight/2)**2)**0.5
+        pointTree = sp.cKDTree(pointList)
+
+        for r,c in stCube.iterrc():
+            yVal, xVal = stCube.findCellCenter(r, c)
+
+            #This returns a circular radius. Points will still need to be checked if they are within the rectangular raster cell
+            closePoints = pointTree.query_ball_point([xVal,yVal], maxDist)
+            
+            for tIndex in range(len(timeList)):                
+                time = timeList[tIndex]
+                numPoints = 0
+                for point in closePoints:
+                    xCoor = pointList[point][0]
+                    yCoor = pointList[point][1]
+
+                    if pointValues[point][1] == time and abs(xCoor-xVal)<=(cellWidth/2) and abs(yCoor-yVal)<=(cellHeight/2):
+                        stCube.data[tIndex][r][c] += pointValues[point][0]
+                        numPoints+=1
+
+                if numPoints != 0:
+                    stCube.data[tIndex][r][c] = (stCube.data[tIndex][r][c])/numPoints
+                                                                                
+        return [stCube, others]
+
+VectorToSTCube = VectorToSTCubePrim()
+
+
         
 # FIXME: Still in development.
 class PartialSumRasterizePrim(Primitive):
