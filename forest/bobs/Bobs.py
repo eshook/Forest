@@ -70,6 +70,12 @@ class Raster(Bob):
         y = self.y + (row*self.cellsize + self.cellsize/2)
         x = self.x + (column*self.cellsize + self.cellsize/2)
         return y, x
+
+    #Determines if a given point is inside of the given cell (based on true coordinates, not row/column numbers)
+    def pointInCell(self, centerX, centerY, pointX, pointY):
+        return ((abs(centerX-pointX)<=self.cellsize/2) and abs(centerY-pointY)<=(self.cellsize/2))
+   
+
     
 # Vector Layer Bob
 class Vector(Bob):        
