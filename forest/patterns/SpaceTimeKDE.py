@@ -5,12 +5,11 @@ Mckenzie Ebert
 '''
 
 
-from ..bob import *
+from ..bobs import *
 from ..primitives import *
+from ..engines import *
 from .Pattern import *
-from ..config import *
 import scipy.spatial as sp
-from ..io import *
 
 #Takes the Vector BOB from the ShapefileRead Prim and makes it into a STCube BOB
 class setUpSTPrim(Primitive):
@@ -93,7 +92,7 @@ class kernelDensityEstimation(Pattern):
 
         print("Running", self.__class__.__name__)
         Config.inputs = [dataFileName, [cellSize, searchRadius, timeGap, filePath]]
-        output = run_primitive(ShapefileRead == setUpST < STKDE > multiGeoWriter)
+        output = run_primitive(ShapefileRead == setUpST < STKDE)
  
         return output
 
