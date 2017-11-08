@@ -1,14 +1,14 @@
 '''
-Clustering / K-Means Algorithm
+Attribute Based Clustering / K-Means Algorithm
 
 Mckenzie Ebert
 '''
 
 
-from ..bob import *
+from ..bobs import *
 from ..primitives import *
+from ..engines import *
 from .Pattern import *
-from ..config import *
 import random
 import scipy.spatial as sp
 
@@ -93,7 +93,7 @@ class checkThreshold(Primitive):
         if oldDistance - newDistance < threshold:
             #Makes the centers variable easier to read in the output. Can be altered if neccessary.
             centers = [[center[0], center[1]] for center in centers]
-            return [newDistance, centers]
+            return [points, centers]
 
         else:
             #Ajusts the center point of each cluster to reflect the average x and y sum of all data points assigned to it. Then resets the sums before looping.
@@ -128,27 +128,37 @@ class KMeans(Pattern):
 
 ##kmean = KMeans("K-Means Algorithm")
 
-#Hardcoded a test run that implements a loop over the findNearest and checkThreshold functions
-def patternTest():
+#Hardcoded Test Run of the Pattern
+class runKM(Pattern):
 
-    temp = kMeanRead.__call__("KMeansTest.txt", 10)
-    points, k = temp[0], temp[1]
-    temp = kInit(points, k)
-    zones, points, centers = temp[0], temp[1], temp[2]
-    temp = nearest(zones, points, centers)
-    points, centers, newDistance, oldDistance, zones = temp[0], temp[1], temp[2], temp[3], temp[4]
-    results = thresholdCheck(points, centers, newDistance, oldDistance, zones)
-
-    length = len(results)
-
-    while length > 2:
-        points, centers, newDistance, oldDistance, zones = nearest(results[0], results[1], results[2], results[3])
-        results = thresholdCheck(points, centers, newDistance, oldDistance, zones)
+    def __call__(self):
+        points, others = ShapefileRead.__call__("TestData/citiesx010g.shp", [10,None])
+        spr = points.sr
+        points, centers, filePath = kInit(points, others)
+        points, centers, newDistance, oldDistance = nearest(points, centers)
+        results = thresholdCheck(points, centers, newDistance, oldDistance)
 
         length = len(results)
 
-    print(results)
-    
+        while length > 2:
+            points, centers, newDistance, oldDistance= nearest(results[0], results[1], results[2])
+            results = thresholdCheck(points, centers, newDistance, oldDistance)
+
+            length = len(results)
+
+        centers = results[1]
+        #print(centers)
+        finalPoints = Raster(points.y, points.x, points.h, points.w, points.s, points.d, 100, 100, points.h/100)
+        for point in centers:
+            for row,col in finalPoints.iterrc():
+                yVal, xVal = finalPoints.findCellCenter(row, col)
+                if finalPoints.pointInCell(xVal, yVal, point[0], point[1]):
+                    finalPoints.data[row][col] = 1000
+
+        #print(finalPoints.x, finalPoints.y, finalPoints.h, finalPoints.w)
+        GeotiffWrite.__call__(finalPoints, spr)
+
+kmean = runKM("K-Means Hard Coded Run")
 
 
 
