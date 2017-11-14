@@ -5,28 +5,28 @@ Mckenzie Ebert
 '''
 
 
-from ..bob import *
+from ..bobs import *
 from ..primitives import *
+from ..engines import *
 from .Pattern import *
-from ..config import *
 import scipy.spatial as sp
 
+#Takes the Vector BOB from the ShapefileRead Prim and makes it into a STCube BOB
+class setUpSTPrim(Primitive):
 
-class rearrangeData(Primitive):
-
-    def __call__(self, points, others):
+    def __call__(self, points, others = None):
+        #Changing the Vector into a STCube
+        results = VectorToSTCube.__call__(points, others[3], others)
+        points = results[0]
+        others = results[1]
         partialSTC = STCube(points.y, points.x, points.h, points.w, points.s, points.d)
         partialSTC.nrows = int(points.h/others[0])
         partialSTC.ncols = int(points.w/others[0])
-        partialSTC.cellwidth = others[0]
-        #Only applicable if assuming points is a STCube, not a vector
-        #partialSTC.cellheight = points.d/len(points.timelist)
-        #partialSTC.timelist = points.timelist
-        #partialSTC.setdata()
+        partialSTC.cellheight = others[0]
         
-        return [points, partialSTC, others[1], others[2], others[3]]
+        return [points, partialSTC, others[1], others[2], others[3], others[4]]
 
-setUp = rearrangeData("Set Up Data")
+setUpST = setUpSTPrim("Set Up Data")
 
 
 
@@ -54,77 +54,45 @@ classicSTKDE = classicPartialSTKDE("Partial KDE")
 
 
 
-#Assumes points is a STCube BOB data structure
+#Takes in points stored in the STCube BOB data structure
 class partialSTKDE(Primitive):
-
-    def __call__(self, points, partialSTC, searchRadius, timeGap, filePath):
-        #We need a better way to convert arrays and vectors into point type lists
-        pointList = points.data[0]
-        pointValues = points.data[1]
+    #It's assumed that each core is only given a partial STCube to analyze - partialSTC would not have the same dimensions in real run through
+    def __call__(self, points, partialSTC, searchRadius, timeGap, attrName, filePath = None):
+        #Puts the data into a form that cKDTree can understand - look into a faster and more efficient way to do so
+        pointList, pointValues = points.getPointListVals()
         pointTree = sp.cKDTree(pointList)
-        
-        for row, column in partialSTC.iterc():
-            yVal, xVal = partialSTC.findCellCenter(row, column)
 
+        #Iterates over all rows, columns, and layers in the partial STCube
+        for row, column in partialSTC.iterrc():
+            #Finds the actual coordinates of the cell
+            yVal, xVal = partialSTC.findCellCenter(row, column)
+            #Finds points near where the calculations should be done
             pointsInRadius = pointTree.query_ball_point([xVal, yVal], searchRadius)
 
             for time in range(len(points.timelist)):
                 timeEnd = points.timelist[time]+timeGap
 
                 for point in pointsInRadius:
-                    #This is not an inclusive range at the moment, but we need to know the time interval/increasing factor to make it inclusive
-                    if pointData[point][0] in range(time, timeEnd):
+                    #Checks if the time is within the given range of values
+                    if (pointValues[point][1] >= time) and (pointValues[point][1] <= timeEnd):
                         distance = ((pointList[point][0]-xVal)**2+(pointList[point][1]-yVal)**2)**0.5
                         partialSTC.data[time][row][column] += pointValues[point][1] * (1 - distance/searchRadius)
 
+                #Adjusts the data
                 partialSTC.data[time][row][column] = partialSTC.data[time][row][column]/searchRadius
 
-        return [partialSTC, points.sr, filePath]
+        return [partialSTC, points.sr, attrName, filePath]
 
-STKDE = partialSTKDE()
-
-
-#Assumes vector data stucture for points
-class partialSTKDEVector(Primitive):
-
-    def __call__(self, points, partialSTC, searchRadius, timeGap, filePath):
-        pointList, pointValues, timeList = points.getSTCPoints(attrName)
-        partialSTC.timelist = timeList
-        partialSTC.cellheight = points.d/len(timeList)
-        partialSTC.setdata()
-        pointTree = sp.cKDTree(pointList)
-
-
-        for row, column in partialSTC.iterrc():
-                yVal, xVal = partialSTC.findCellCenter(row, column)
-
-                pointsInRadius = pointTree.query_ball_point([xVal, yVal], searchRadius)
-
-                for time in range(len(partialSTC.timelist)):
-                timeEnd = partialSTC.timelist[time]+timeGap
-
-                for point in pointsInRadius:
-                    #This is not an inclusive range at the moment, but we need to know the time interval/increasing factor to make it inclusive
-                    if pointData[point][0] in range(time, timeEnd):
-                        distance = ((pointList[point][0]-xVal)**2+(pointList[point][1]-yVal)**2)**0.5
-                        partialSTC.data[time][row][column] += pointValues[point][1] * (1 - distance/searchRadius)
-
-                partialSTC.data[time][row][column] = partialSTC.data[time][row][column]/searchRadius
-                    
-
-        return [partialSTC, points.sr, filePath]
-
-STKDEVector = partialSTKDEVector("Partial KDE")
-
+STKDE = partialSTKDE("Partial Space-Time KDE")
 
 
 class kernelDensityEstimation(Pattern):
 
-    def __call__(self, dataFileName, cellSize, searchRadius, timeGap, filePath = None):
+    def __call__(self, dataFileName, cellSize, searchRadius, timeGap, attrName, filePath = None):
 
         print("Running", self.__class__.__name__)
         Config.inputs = [dataFileName, [cellSize, searchRadius, timeGap, filePath]]
-        output = run_primitive(ShapefileRead == setUp < STKDEVector > multiGeoWriter)
+        output = run_primitive(ShapefileRead == setUpST < STKDE)
  
         return output
 

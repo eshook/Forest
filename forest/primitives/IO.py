@@ -107,7 +107,7 @@ class ShapefileReadPrim(Primitive):
         # A layer is an unordered set of features described by type, geometry, id, and attributes. Each feature's
         # key is a unique FID.  
         newlayer = {} 
-        spatialReference = str(layer.GetSpatialRef())
+        spatialReference = layer.GetSpatialRef()
         
         """Get y,x reference from the first feature to use for initializing the Bob and its origin for this vector layer"""
         firstFeature = layer[0]

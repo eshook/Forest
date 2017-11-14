@@ -70,6 +70,12 @@ class Raster(Bob):
         y = self.y + (row*self.cellsize + self.cellsize/2)
         x = self.x + (column*self.cellsize + self.cellsize/2)
         return y, x
+
+    #Determines if a given point is inside of the given cell (based on true coordinates, not row/column numbers)
+    def pointInCell(self, centerX, centerY, pointX, pointY):
+        return ((abs(centerX-pointX)<=self.cellsize/2) and abs(centerY-pointY)<=(self.cellsize/2))
+   
+
     
 # Vector Layer Bob
 class Vector(Bob):        
@@ -180,6 +186,8 @@ class STCube(Bob):
         
     def setdata(self,data = None):
         if data==None:
+            self.data = []
+            self.nlayers = len(self.timelist)
             for time in range(len(self.timelist)):
                 self.data.append(np.zeros((self.nrows,self.ncols)))
         else:    
@@ -200,7 +208,10 @@ class STCube(Bob):
                 for column in range(self.ncols):
 
                     pointData.append([self.data[time][row][column], self.timelist[time]])
-                    pointList.append([row, column])
+                    y, x = self.findCellCenter(row, column)
+                    pointList.append([x, y])
+
+        return pointList, pointData
 
 
     def findCellCenter(self, row, column, time=None):

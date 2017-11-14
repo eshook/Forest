@@ -4,11 +4,10 @@ Inverse Distance Weighted
 Mckenzie Ebert
 '''
 
-from ..bob import *
+from ..bobs import *
 from ..primitives import *
+from ..engines import *
 from .Pattern import *
-from ..config import *
-from ..io import *
 import scipy.spatial as sp
 
 #This primitive is used in reordering the input data as well as creating

@@ -6,9 +6,8 @@ Mckenzie Ebert
 
 from ..bob import *
 from ..primitives import *
+from ..engines import *
 from .Pattern import *
-from ..config import *
-from ..io import *
 import scipy.spatial as sp
 
 #This primitive is used to set-up the data coming in from the input data files
