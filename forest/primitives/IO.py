@@ -442,7 +442,7 @@ class CsvReadNewPrim(Primitive):
     def __init__(self):
         
         # Call the __init__ for Primitive  
-        super(CsvSTCReadPrim,self).__init__("CsvSTCRead")
+        super(CsvReadNewPrim,self).__init__("CsvSTCRead")
 
         # Set passthrough to True so that data is passed through
         self.passthrough = True

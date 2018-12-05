@@ -7,7 +7,7 @@ Use of this source code is governed by a BSD-style license that can be found in 
 
 from .Pattern import *
 from .IDW import *
-from .KDE import *
+#from .KDE import * # Temporarily removing KDE
+#from .uniformKDE import * # Temporarily removing uniformKDE
 from .KMeans import *
 from .SpaceTimeKDE import *
-from .uniformKDE import *
