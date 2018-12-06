@@ -11,3 +11,14 @@ We took a brief break from developing the ForEST code to work on the theoretical
  |__________________|   We will return to this code shortly.
   ==================
  </pre>
+
+## Update: We are back!
+After our summer whiteboard break and a busy semester we are returning to the code.
+We have some exciting news. ForEST is being used for research.
+Two projects are ramping up that will be using ForEST.
+One will be using ForEST to develop a spatial dispersal model of an invasive species in the state of Minnesota, the Brown Marmorated Stink Bug.
+THis is a funded project and a postdoc will be working on this ForEST-based model for two years.
+The second will be using ForEST to analyze satellite imagery to identify farm fields.
+This is an exploratory project that will be funded soon hopefully.
+Certainly there will be more to come, but these projects will be some of the first that demonstrate the power of ForEST. 
+

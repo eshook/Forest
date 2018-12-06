@@ -20,7 +20,7 @@ class TestBob(unittest.TestCase):
         self.assertEqual(self.bob100.x,0)
         self.assertEqual(self.bob100.h,100)
         self.assertEqual(self.bob100.w,100)
-        self.assertEqual(self.bob100.s,0)
+        self.assertEqual(self.bob100.t,0)
         self.assertEqual(self.bob100.d,0)
         self.assertEqual(self.bob100.data,None)
         

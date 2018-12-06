@@ -5,16 +5,20 @@ Use of this source code is governed by a BSD-style license that can be found in 
 @contributors: <Contribute and add your name here!>
 """
 
+# TODO: Replace individual variables with numpy arrays
+#       use accessors to get access to individual values
+#       Need to profile to see if this improves overall speedup.
+
 # Just Bob
 # (Or for those less cool folks a Bounding OBject :-)
 class Bob(object):
-    def __init__(self, y = 0, x = 0, h = 0, w = 0, s = 0, d = 0):
+    def __init__(self, y = 0, x = 0, h = 0, w = 0, t = 0, d = 0):
         self.y = y # y-axis (origin)
         self.x = x # x-axis (origin)           ___
         self.h = h # height (y-axis)        Y |\__\
         self.w = w # width  (x-axis)        X \|__|
-        self.s = s # start time                 T
-        self.d = d # duration (time)
+        self.t = t # t-axis (origin)             T
+        self.d = d # duration (t-axis)
 
         self.data = None # By default Bobs don't have any data
 
