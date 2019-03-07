@@ -21,6 +21,8 @@ def zonalaverage_oldschool(zonefilename, datafilename):
     raster = GeotiffRead(filename = datafilename)    
     print("raster=",raster)
     print("raster data len",len(raster.data))
+    print("raster data sum",sum(raster.data.flatten()))
+
 
     # Calculate partial sum of vector and raster
     ps = PartialSumRasterize(vector, raster)
@@ -49,7 +51,9 @@ def testit_oldschool(zonefilename, datafilename):
 def zonalaverage_forest(zonefilename, datafilename):
 
     #output = run_primitive( VectorZoneTest.reg(zonefilename) == RasterDataTest.reg(datafilename) < PartialSum > AggregateSum == Average )
+
     output = run_primitive( ShapefileNewRead.reg(zonefilename) == GeotiffRead.reg(datafilename) < PartialSumRasterize > AggregateSum == Average )
+    #output = run_primitive( ShapefileNewRead.reg(zonefilename) == GeotiffRead.reg(datafilename) == PartialSumRasterize )
 
     return output
     
@@ -60,7 +64,7 @@ def testit_forest(zonefilename, datafilename):
     zonalaverage = zonalaverage_forest(zonefilename, datafilename)
     
     print("ZonalAverage=",zonalaverage)
-    
+    print("ZAData      =",zonalaverage.data)
     for zone in sorted(zonalaverage.data):
         print(zone,"=",zonalaverage.data[zone])
     
@@ -83,13 +87,13 @@ def testit_nearrepeat(datafile):
     print("finished near repeat test")
  
 if __name__ == '__main__':
-    print("Uncomment tests below once data is in examples/data")    
-    #zonefilename = "examples/data/states.shp"
-    #datafilename = "examples/data/glc2000.tif"
+    #print("Uncomment tests below once data is in examples/data")    
+    zonefilename = "examples/data/states.shp"
+    datafilename = "examples/data/glc2000.tif"
     #datafilename = "examples/data/crimes.csv"
     
         
     #testit_oldschool(zonefilename,datafilename)
-    #testit_forest(zonefilename,datafilename)
+    testit_forest(zonefilename,datafilename)
     #testit_nearrepeat(datafile)
 

@@ -10,10 +10,13 @@ from ..bobs.Bob import *
 
 class Primitive(object):
 
-    def __init__(self, name):
+    def __init__(self, name = None):
         
         # Set name
-        self.name = name
+        self.name = self.__class__.__name__
+        if name is not None:
+            self.name = name
+
         
         # FIXME: Need to think this through more
         # If this primitive should pass through Bobs, then enable it.

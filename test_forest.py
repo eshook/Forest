@@ -7,7 +7,7 @@ Use of this source code is governed by a BSD-style license that can be found in 
 
 # Begin coverage testing
 import coverage
-cov = coverage.coverage()
+cov = coverage.coverage(omit = "/usr/*")
 cov.start()
 
 from forest import *
@@ -21,7 +21,7 @@ from unittests import *
 
 # Test the full suite (each test file in the unittests directory stores a unittest suite)
 # The following line collapses them into a 'full suite' of tests        
-full_suite = unittest.TestSuite([test_Bob_suite,test_Bobs_suite,test_PrimitivesRaster_suite])
+full_suite = unittest.TestSuite([test_Bob_suite,test_Bobs_suite,test_IO_suite,test_PrimitivesRaster_suite])
 
 
 # Run the full suit using the 'unittest' package
@@ -33,4 +33,4 @@ if run_return.wasSuccessful():
 
     # Stop coverage testing and print out a report on percent of code covered by testing
     cov.stop()
-    cov.report()
+    cov.report(show_missing = True)

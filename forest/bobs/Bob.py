@@ -20,7 +20,10 @@ class Bob(object):
         self.t = t # t-axis (origin)             T
         self.d = d # duration (t-axis)
 
+        self.createdby = "" # Who or what created these data
+
         self.data = None # By default Bobs don't have any data
+
 
     def __repr__(self):
         return "Bob (%f,%f) [%f,%f]" % (self.y,self.x,self.h,self.w)

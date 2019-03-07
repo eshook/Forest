@@ -59,18 +59,21 @@ class Engine(object):
         # Get the inputs        
         inputs = Config.inputs
     
+        # FIXME: REMOVE BELOW DATASTACK
         # Save the flows information in the global config data structure
         # FIXME: The problem with this solution is all data will be stored
         #        indefinitely, which is going to be a huge problem.
-        Config.flows[name] = {}
-        Config.flows[name]['input'] = inputs   
+        # Config.flows[name] = {}
+        # Config.flows[name]['input'] = inputs   
     
         # If Bobs are not split, then it is easy
         if Config.engine.is_split is False:
 
             if isinstance(inputs,Bob):     # If it is a bob
+                print("inputs for primitive",primitive.name," inputs",inputs.data)
                 inputs = primitive(inputs)    # Just pass in the bob
             else:                          # If it is a list
+                print("inputs for primitive",primitive.name," inputs",inputs)
                 inputs = primitive(*inputs)   # De-reference the list and pass as parameters
         
         else: # When they are split we have to handle the list of Bobs
@@ -87,7 +90,8 @@ class Engine(object):
             inputs = new_inputs
         
         # Save the outputs from this primitive
-        Config.flows[name]['output'] = inputs
+        # FIXME: REMOVE BELOW DATASTACK
+        # Config.flows[name]['output'] = inputs
         
         # Save inputs from this/these primitive(s), for the next primitive
         if primitive.passthrough is False: # Typical case
@@ -115,21 +119,18 @@ class TileEngine(Engine):
         self.is_split=False
         
     # Split (<)
-    
-    # FIXME: Split also has to reach into Config.flows in case if functions pull out of list
-    # Keeping a nested open/bound variable stack might be easier than flows
-    # Think this one through
-    
     def split(self, bobs):
+
+        # If already split, do nothing.
+        if self.is_split is True:
+            return
+
+        # Otherwise start the split process
         
         # Set the number of tiles to split to
         # FIXME: Eventually this should be determined or user-defined.
         num_tiles = Config.n_tile
         print("-> Number of tiles = ", num_tiles)
-        
-        # If already split, do nothing.
-        if self.is_split is True:
-            return
         
         new_inputs = []
         # Loop over bobs in inputs to split
@@ -141,6 +142,9 @@ class TileEngine(Engine):
             # Split only works for rasters for now
             # For all other data types (e.g., vectors) we just duplicate the data
             if not isinstance(bob,Raster): # Check if not a raster
+
+                '''
+                # Temporarily removing STPoints and Points from the code before more vetting
 				#spatio temporal point decomposition by box based splitting
                 if isinstance(bob,STPoint):
                     #this should already be calculated and should be a global parameter
@@ -197,10 +201,11 @@ class TileEngine(Engine):
                                 continue
                     new_inputs.append(tiles)
                     continue
+                '''
+
+		# If it isn't a raster, then just copy the bob for each tile.
+
                 for tile_index in range(num_tiles):
-                    ######FIX ME: Fetch vector data later in worker#######
-                    # tiles.append('vector')
-                    ###+++++++++++++++++++++++++++++++++++++++++++++++++##
                     tiles.append(bob) # Just copy the entire bob to a tile list
                     
                 new_inputs.append(tiles) # Now add the tiles to new_inputs
@@ -243,7 +248,6 @@ class TileEngine(Engine):
                 tile.r =     tile_r
                 tile.c =     tile_c
                 tile.cellsize = bob.cellsize
-                tile.datatype = bob.datatype
                 
                 ######################################################
                 ## Copy filename from Raster Bob to each tile
@@ -253,7 +257,7 @@ class TileEngine(Engine):
                 # FIXME: Need a better method to copy these over.
                 
                 # Split the data (depends on raster/vector)
-                # tile.data = bob.get_data(tile_r,tile_c,tile_nrows,tile_ncols)
+                tile.data = bob.get_data(tile_r,tile_c,tile_nrows,tile_ncols)
                 ######################################################
                                 
                 # Save tiles
@@ -302,6 +306,9 @@ def worker(input_list):
     splitbobs = iq.get()
 
     ######################################################
+    # FIXME: This seems to be having problems.
+    # This code assumes that the data has not been read yet, it also assumes you have a 1 band raster
+    # These assumptions don't always hold.
     tile = splitbobs[1]
     filehandle = gdal.Open(tile.filename)
     band = filehandle.GetRasterBand(1)
@@ -372,12 +379,13 @@ class MultiprocessingEngine(Engine):
         # Get the inputs        
         inputs = Config.inputs
     
+        # FIXME: REMOVE BELOW DATASTACK
         # Save the flows information in the global config data structure
         # FIXME: The problem with this solution is all data will be stored
         #        indefinitely, which is going to be a huge problem.
-        Config.flows[name] = {}
-        Config.flows[name]['input'] = inputs   
-        print(inputs)
+        # Config.flows[name] = {}
+        # Config.flows[name]['input'] = inputs   
+        # print(inputs)
 
         # If Bobs are not split, then it is easy
         if Config.engine.is_split is False:
@@ -432,7 +440,8 @@ class MultiprocessingEngine(Engine):
             pool.join()
 
         # Save the outputs from this primitive
-        Config.flows[name]['output'] = inputs
+        # FIXME: REMOVE BELOW DATASTACK
+        # Config.flows[name]['output'] = inputs
         
         # Save inputs from this/these primitive(s), for the next primitive
         if primitive.passthrough is False: # Typical case
@@ -448,9 +457,9 @@ mp_engine = MultiprocessingEngine()
 
 # Set the Config.engine as the default
 
+Config.engine = mp_engine
 Config.engine = tile_engine
 Config.engine = pass_engine
-Config.engine = mp_engine
 
 print("Default engine",Config.engine)
 

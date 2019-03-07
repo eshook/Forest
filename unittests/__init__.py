@@ -8,4 +8,5 @@ Use of this source code is governed by a BSD-style license that can be found in 
 # Import unittests
 from .test_Bob import *
 from .test_Bobs import *
+from .test_IO import *
 from .test_PrimitivesRaster import *

@@ -19,11 +19,11 @@ from .Bob import *
 
 # Raster Layer Bob
 class Raster(Bob):
-    
-    def __init__(self, y = 0, x = 0, h = 10, w = 10, s = 0, d = 0, nrows = 10, ncols = 10, cellsize = 1, filename = None, nodatavalue = None):
+    # By default you get a raster size of 10x10    
+    def __init__(self, y = 0, x = 0, h = 10, w = 10, t = 0, d = 0, nrows = 10, ncols = 10, cellsize = 1, filename = None, nodatavalue = None, emptydata = False):
         
         # Call the __init__ for Bob        
-        super(Raster, self).__init__(y, x, h, w, s, d)
+        super(Raster, self).__init__(y, x, h, w, t, d)
 
         # Set the number of rows and columns
         self.nrows = nrows
@@ -32,12 +32,23 @@ class Raster(Bob):
         # Set the cellsize
         self.cellsize = cellsize
         
-        # FIXME: FIXED DATATYPE RIGHT NOW
-        self.datatype = "Float" 
+        # Check if this raster is supposed to be empty. 
+        if emptydata is False: 
+            # Create a zero raster array
+            self.data = np.zeros((self.nrows,self.ncols))
+
         
-        # FIXME: Make this optional in the future (with a flag)
-        # Create a zero raster array
-        self.data = np.zeros((self.nrows,self.ncols))
+        #assert nrows*cellsize == h
+        #assert np.isclose(nrows*cellsize,h,rtol=1e-05, atol=1e-08, equal_nan=False)
+        if not np.isclose(nrows*cellsize, h, equal_nan=False):
+            print("[ ERROR ] nrwostcs = ", nrows*cellsize) 
+            print("[ ERROR ] h=", h)
+            print("[ ERROR ] filename", filename, "y=", y)
+
+        #assert np.isclose(nrows*cellsize,h, equal_nan=False)
+        #assert float(nrows)*float(cellsize) == float(h)
+        print((float(nrows)*float(cellsize)),float(h))
+        #assert ncols*cellsize==w
         
         # FIXME: Sanity check h/w with nrows/ncols * cellsize
         # either reset Bob or print warning (flag?)
@@ -157,7 +168,7 @@ class KeyValue(Bob):
         # Make an empty dictionary for key-values
         self.data = {}
 
-
+'''
 # Bob to store a stack of rasters arranged as a space-time cube (STCube)
 # Originally authored by Jacob Arndt
 class STCube(Bob):
@@ -237,10 +248,13 @@ class Point(Vector):
         super(Point,self).__init__(y,x,h,w,s,d)
         #we need a seperate container for halo zones
         self.halo = []
+
+
 #Spatio temporal point layer
 class STPoint(Point):
     def __init__(self,y = 0, x = 0, h = 10, w = 10, s = 0, d = 0):
         super(STPoint,self).__init__(y,x,h,w,s,d)
         #we need a seperate container for halo zones
         self.halo = []        
+'''
     

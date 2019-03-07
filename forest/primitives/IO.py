@@ -7,7 +7,8 @@ Use of this source code is governed by a BSD-style license that can be found in 
 
 # FIXME: We need to have conditional imports here eventually
 from collections import OrderedDict
-from osgeo import ogr,gdal,osr
+#from osgeo import ogr,gdal,osr
+import gdal
 import json
 import fiona
 import csv
@@ -283,10 +284,8 @@ class GeotiffReadPrim(Primitive):
         
         ######################################################
         ## Enable paralell processing
-        paralell = True 
-        if paralell == False:
-            nparr=band.ReadAsArray(0,0,ncols,nrows) 
-            layer.data = nparr
+        nparr=band.ReadAsArray(0,0,ncols,nrows) 
+        layer.data = nparr
         layer.filename = self.filename
         layer.nodatavalue = nodata_value
         ######################################################
@@ -298,9 +297,8 @@ class GeotiffReadPrim(Primitive):
         ds=None 
         band=None
         ######################################################
-        if paralell == False:
-            del nparr
-            nparr=None
+        del nparr
+        nparr=None
         ######################################################
     
         return layer

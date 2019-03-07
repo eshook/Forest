@@ -13,8 +13,8 @@ import numpy as np
 
 class TestPrimitivesRaster(unittest.TestCase):
     def setUp(self):
-        self.raster0 = Raster(0,0,4,4,cellsize = 1,nrows = 4, ncols = 4)
-        self.raster1 = Raster(0,0,4,4,cellsize = 1,nrows = 4, ncols = 4)
+        self.raster0 = Raster(0,0,4,4,cellsize = 1,nrows = 4, ncols = 4, filename = "raster0")
+        self.raster1 = Raster(0,0,4,4,cellsize = 1,nrows = 4, ncols = 4, filename = "raster1")
         
         self.raster0.data = np.zeros((4,4))
         self.raster1.data = np.ones((4,4))
@@ -57,7 +57,7 @@ class TestPrimitivesRaster(unittest.TestCase):
 
         # Maximum of two arrays
         oraster = LocalMaximum(self.raster0,self.raster1)
-                
+
         # Should be 1's
         self.assertTrue((oraster.data ==ones_array).all())
         #self.assertListEqual(oraster.data,ones_array)

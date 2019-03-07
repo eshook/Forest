@@ -27,7 +27,7 @@ class RFunct(Primitive):
     def __call__(self, left = None, right = None):
 
         # Duplicate our left raster for the output # FIXME: Is this right?
-        out = Raster(left.y,left.x,left.h,left.w)
+        out = Raster(left.y,left.x,left.h,left.w,nrows=left.nrows,ncols=left.ncols)
 
         # If left and right are set, apply function to left and right
         if left != None and right != None:

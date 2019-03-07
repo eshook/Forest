@@ -10,9 +10,10 @@ Use of this source code is governed by a BSD-style license that can be found in 
 # to be passed as 'inputs' to the next interop
 inputs = []
 
+# FIXME: REMOVE FOLLOWING DATASTACK
 # This is a global variable that goes beyond inputs. 
 # It is a register for data flows that can be 'tapped' if needed
-flows = {}
+# flows = {}
 
 # This is a global variable that enables users and developers
 # to control which computational engine is used
