@@ -15,94 +15,80 @@ import multiprocessing
 import numpy as np
 import gdal
 
+# This is a generic 'stack' data structure.
+class Stack(object):
+    def __init__(self):
+        self.stack = []
+
+    def push(self,entity):
+        print("PUSH",entity)
+        return self.stack.append(entity)
+        
+    def pop(self):
+        print("POP")
+        return self.stack.pop()
+
+    def notempty(self):
+        return len(self.stack)>0
+
+    def __repr__(self):
+        return "Stack("+str(len(self.stack))+")"
+
 class Engine(object):
     def __init__(self, engine_type):
         self.engine_type = engine_type # Describes the type of engine
         self.is_split = False # The data are not split at the beginning
+
+        self.stack = Stack() # Data stack
+
+
         
     def __repr___(self):
         return "Engine "+str(self.engine_type)
         
     # Split (<)
-    def split(self, bobs):
+    # Split has two possible consequences:
+    # (1) Modify the data stack by splitting bobs and creating multiple data stacks
+    # (2) Initiate parallelism, which can be applied to one or more of the split data stacks
+    def split(self):
         pass
     
     # Merge (>)
-    def merge(self, bobs):
+    # Merge has two possible consequences:
+    # (1) Modify the data stack by merging bobs from multiple data stacks and return to a single data stack
+    # (2) End parallelism
+    def merge(self):
         pass
 
     # Sequence (==)
-    def sequence(self, bobs):
+    def sequence(self):
         pass
     
     # Synchronization (!=)
-    def synchronization(self, bobs):
+    def synchronization(self):
         pass
     
     # Cycle start (<<)
-    def cycle_start(self, bobs):
+    def cycle_start(self):
         pass
     
     # Cycle termination (>>)
-    def cycle_termination(self, bobs):
+    def cycle_termination(self):
         pass
 
     # This method will run a single primitive operation
-    # It will pull data from inputs and run the primitive
-    # It will save the input
     def run(self, primitive):
         print("Running", primitive)
 
         # Get the name of the primitive operation being executed
         name = primitive.__class__.__name__
 
-        # Get the inputs        
-        inputs = Config.inputs
-    
-        # FIXME: REMOVE BELOW DATASTACK
-        # Save the flows information in the global config data structure
-        # FIXME: The problem with this solution is all data will be stored
-        #        indefinitely, which is going to be a huge problem.
-        # Config.flows[name] = {}
-        # Config.flows[name]['input'] = inputs   
-    
-        # If Bobs are not split, then it is easy
-        if Config.engine.is_split is False:
+        # Normally we would check is_split, but in the basic case we don't handle it.
+        # So just call the primitive
+        # The primitive will pop bobs off the stack and push outputs back on.
+        primitive()
 
-            if isinstance(inputs,Bob):     # If it is a bob
-                print("inputs for primitive",primitive.name," inputs",inputs.data)
-                inputs = primitive(inputs)    # Just pass in the bob
-            else:                          # If it is a list
-                print("inputs for primitive",primitive.name," inputs",inputs)
-                inputs = primitive(*inputs)   # De-reference the list and pass as parameters
-        
-        else: # When they are split we have to handle the list of Bobs
-            new_inputs = []
-            # Loop over the split bobs
-            
-            for splitbobs in inputs:
-                out = None # Record output from primitive
-                if isinstance(splitbobs,Bob): # If it is a bob
-                    out = primitive(splitbobs)       # Just pass in the bob
-                else:                         # If it is a list
-                    out = primitive(*splitbobs)      # De-reference the list and pass as parameters
-                new_inputs.append(out) # Save the output in the new_inputs list
-            inputs = new_inputs
-        
-        # Save the outputs from this primitive
-        # FIXME: REMOVE BELOW DATASTACK
-        # Config.flows[name]['output'] = inputs
-        
-        # Save inputs from this/these primitive(s), for the next primitive
-        if primitive.passthrough is False: # Typical case
-            Config.inputs = inputs # Reset the inputs
-        else:
-            assert(Config.engine.is_split is False)
-            Config.inputs.append(inputs) # Add to the inputs
-            
-        return inputs
 
-# FIXME: Change to Engines.py    
 class PassEngine(Engine):
     def __init__(self):
         # FIXME: Need an object to describe type of engines rather than a string
@@ -111,19 +97,106 @@ class PassEngine(Engine):
 # This is the default engine that doesn't do anything.
 pass_engine = PassEngine()    
 
-# FIXME: Change to Engines.py    
+
 class TileEngine(Engine):
     def __init__(self):
         # FIXME: Need an object to describe type of engines rather than a string
         super(TileEngine,self).__init__("TileEngine")
-        self.is_split=False
+
+        self.split_stacks = [] # List of Data stacks to maintain (only when split into tiles)
         
     # Split (<)
-    def split(self, bobs):
+    def split(self):
 
         # If already split, do nothing.
         if self.is_split is True:
             return
+        
+        # Set split to True so engine knows that the data stack has been split 
+        self.is_split = True 
+
+        num_tiles = Config.n_cores # The the number of tiles to split into as the number of cores
+
+        # Make a list of data stacks for the split
+        self.split_stacks = []
+        for i in range(num_tiles):
+            self.split_stacks.append(Stack()) 
+
+        print("split_stacks",self.split_stacks)
+
+
+        # Here we need to be careful, because the order of the data stack is important.
+        # To maintain order while splitting everything we will make a temporary stack
+        # for bobs "to be split"
+
+        tobesplit_stack = Stack()
+        while self.stack.notempty():
+            # Take a bob off the current stack and push it on the tobesplit stack
+            bob = self.stack.pop()
+            tobesplit_stack.push(bob)
+
+        # Now the data stack is empty and we can begin splitting all the bobs
+        while tobesplit_stack.notempty():
+            bob = tobesplit_stack.pop() # Pop off a bob
+
+            # FIXME: This needs to be handled better.
+            if not isinstance(bob,Raster): # If it isn't a Raster, thne don't try to split it. Just copy it...
+                for i in range(num_tiles):
+                    self.split_stacks[i].push(bob) # Just push entire bob on each split stack. 
+                    
+                continue # Now skip to the next bob in the list
+
+            # Now we are dealing with a Raster
+            # Set tile nrows and ncols using row decomposition for now
+            tile_nrows = math.ceil(bob.nrows / num_tiles)
+            tile_ncols = bob.ncols
+            
+            for tile_index in range(num_tiles):
+                # Calculate the r,c location
+                tile_r = tile_nrows * tile_index
+                tile_c = 0
+                
+                # For the last tile_index, see if we are "too tall"
+                # Meaning that the tiles are larger than the bob itself
+                #  split Bob size      > Actual bob size
+                if tile_r + tile_nrows > bob.nrows:
+                    # If so, then resize so it is correct to bob.nrows
+                    tile_nrows = bob.nrows - tile_r
+                
+                # Set tile height and width
+                tile_h = bob.cellsize * tile_nrows
+                tile_w = bob.w
+
+                # Calculate y,x
+                tile_y = bob.y + tile_r * bob.cellsize
+                tile_x = bob.x
+                
+                # Create the tile
+                tile = Bob(tile_y,tile_x,tile_h,tile_w)
+                tile.nrows = tile_nrows
+                tile.ncols = tile_ncols
+                tile.r =     tile_r
+                tile.c =     tile_c
+
+                # Copy some attributes from the bob
+                tile.cellsize =    bob.cellsize
+                tile.filename =    bob.filename 
+                tile.nodatavalue = bob.nodatavalue
+                
+                # Split the data (depends on raster/vector)
+                tile.data = bob.get_data(tile_r,tile_c,tile_nrows,tile_ncols)
+                ######################################################
+
+                # Push this tile onto the split stack at it's index position
+                self.split_stacks[tile_index].push(tile)
+
+        print("stack",self.stack)
+        print("tobestack",tobesplit_stack)
+        print("splitstack",self.split_stacks)
+
+        return # Then quit for now so code works
+
+        # # # ## #  # # # ## # # # # # ## # # # # ### ## # # # # ## # # #
 
         # Otherwise start the split process
         
@@ -277,12 +350,17 @@ class TileEngine(Engine):
         self.is_split = True 
         
     # Merge (>)
-    def merge(self, bobs):
+    def merge(self):
+        # FIXME: This needs to be handled.
+        # For now just copy the first stack in split_stack, and remove split_stack
+        self.stack = self.split_stacks[0]
+        self.split_stacks = []
+
         # Now that everything is merged set split to be false
         self.is_split = False
 
     # Sequence (==)
-    def sequence(self, bobs):
+    def sequence(self):
         # If the Bobs are split, then handle it
         # If they are not, then there is nothing to do
         if self.is_split is True:
@@ -290,6 +368,31 @@ class TileEngine(Engine):
             print("NEED TO LOOP OVER SPLIT BOBS")
             pass # Loop over all the split Bobs
         pass
+
+    # This method will run a single primitive operation
+    def run(self, primitive):
+        print("Running", primitive)
+
+        # Get the name of the primitive operation being executed
+        name = primitive.__class__.__name__
+
+        # Check is_split, if running split then loop over split stacks
+        if self.is_split:
+            # Loop over each split stack
+            for i in range(len(self.split_stacks)):
+                # Assign it as the main stack
+                self.stack = self.split_stacks[i]
+
+                # Run the primitive, which will apply itself to this split stack
+                # including pushing everything back onto the stack
+                primitive()
+
+                # So once it is done, save the results back to the split stack
+                self.split_stacks[i] = self.stack
+
+        else:
+             # otherwise just run the primitive
+             primitive()
 
     
 tile_engine = TileEngine()

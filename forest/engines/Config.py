@@ -8,7 +8,7 @@ Use of this source code is governed by a BSD-style license that can be found in 
 
 # This is a global variable that allows the outputs from one interop 
 # to be passed as 'inputs' to the next interop
-inputs = []
+#inputs = []
 
 # FIXME: REMOVE FOLLOWING DATASTACK
 # This is a global variable that goes beyond inputs. 
@@ -19,5 +19,9 @@ inputs = []
 # to control which computational engine is used
 # When set to pass_engine, the pattern operators (< > !=) do nothing.
 engine = None
-n_tile = 20
-n_core = 4
+
+# Preferred number of tiles to split bobs into
+n_tiles = 20
+
+# Preferred number of cores to use in parallel computing
+n_cores = 4

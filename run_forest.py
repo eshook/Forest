@@ -3,6 +3,10 @@ from forest.bobs.Bobs import *
 
 import forest.engines.Config
 
+print("engine",Config.engine)
+Config.engine = tile_engine
+print("engine",Config.engine)
+
 # Debugger line
 #import pdb; pdb.set_trace()
 
@@ -92,8 +96,16 @@ if __name__ == '__main__':
     datafilename = "examples/data/glc2000.tif"
     #datafilename = "examples/data/crimes.csv"
     
+    d1 = "examples/data/data1.asc"
+    d2 = "examples/data/data2.asc"
+    do = "examples/data/datao.asc"
+    
+    #run_primitive(GeotiffLoad.file(datafilename) == GeotiffLoad.file(datafilename) == LocalAdd)
+    #run_primitive(AGLoad.file(d1) == AGLoad.file(d1) == AGLoad.file(d2) < RasterAdd == RasterSub > AGStore.file(do))
+    run_primitive(AGLoad.file(d1) == AGLoad.file(d1) == AGLoad.file(d2) == RasterAdd == RasterSub == AGStore.file(do))
+
         
     #testit_oldschool(zonefilename,datafilename)
-    testit_forest(zonefilename,datafilename)
+    #testit_forest(zonefilename,datafilename)
     #testit_nearrepeat(datafile)
 

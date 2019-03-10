@@ -25,14 +25,14 @@ class Raster(Bob):
         # Call the __init__ for Bob        
         super(Raster, self).__init__(y, x, h, w, t, d)
 
-        # Set the number of rows and columns
+        # Set the number of rows and columns and other attributes
         self.nrows = nrows
         self.ncols = ncols
-
-        # Set the cellsize
         self.cellsize = cellsize
+        self.nodatavalue = nodatavalue
+        self.filename = filename
         
-        # Check if this raster is supposed to be empty. 
+        # Check if this raster is supposed to be empty. Skip making the data if it is. 
         if emptydata is False: 
             # Create a zero raster array
             self.data = np.zeros((self.nrows,self.ncols))
@@ -41,7 +41,7 @@ class Raster(Bob):
         #assert nrows*cellsize == h
         #assert np.isclose(nrows*cellsize,h,rtol=1e-05, atol=1e-08, equal_nan=False)
         if not np.isclose(nrows*cellsize, h, equal_nan=False):
-            print("[ ERROR ] nrwostcs = ", nrows*cellsize) 
+            print("[ ERROR ] nrowsXcs = ", nrows*cellsize) 
             print("[ ERROR ] h=", h)
             print("[ ERROR ] filename", filename, "y=", y)
 
@@ -96,7 +96,6 @@ class Vector(Bob):
         self.sr = None
         self.geom_types = [] # The geometry types the VBob holds.
         
-    
     def getFeature(self,fid):
         return self.data[fid]
     

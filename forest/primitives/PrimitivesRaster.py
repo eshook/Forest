@@ -9,6 +9,89 @@ from .Primitive import *
 from ..bobs.Bobs import *
 
 import math
+import numpy as np
+
+# FIXME: Instead of making a class for each Primitive type
+#        we can make a pop2data wrapper as part of __init__ parameter
+#        that way you can create RasterAdd like this:
+#        RasterAdd = Primitive(name="RasterAdd",pop2data = np.add)
+#        If you have a function that accepts/outputs bobs then you could have
+#        BobOutput = Primitive(name="SomePrim",pop2 = function)
+
+class RasterAdd(Primitive):
+    def __call__(self):
+        # This decorator will wrap the pop2data function around data2
+        @pop2data
+        def data2(l,r):
+            return np.add(l,r)
+
+RasterAdd = RasterAdd()
+
+# Need a wrapper function around object methods unfortunately...
+class RasterSub(Primitive):
+    def __call__(self):
+        # This decorator will wrap the pop2data function around data2
+        @pop2data
+        def data2(l,r):
+            return np.subtract(l,r)
+
+RasterSub = RasterSub()
+
+# Need a wrapper function around object methods unfortunately...
+class RasterMul(Primitive):
+    def __call__(self):
+        # This decorator will wrap the pop2data function around data2
+        @pop2data
+        def data2(l,r):
+            return np.multiply(l,r)
+
+RasterMul = RasterMul()
+
+# Need a wrapper function around object methods unfortunately...
+class RasterDiv(Primitive):
+    def __call__(self):
+        # This decorator will wrap the pop2data function around data2 
+        @pop2data
+        def data2(l,r):
+            return np.divide(l,r)
+
+RasterDiv = RasterDiv()
+
+# Need a wrapper function around object methods unfortunately...
+class RasterMin(Primitive):
+    def __call__(self):
+        # This decorator will wrap the pop2data function around data2 
+        @pop2data
+        def data2(l,r):
+            return np.minimum(l,r)
+
+RasterMin = RasterMin()
+
+# Need a wrapper function around object methods unfortunately...
+class RasterMax(Primitive):
+    def __call__(self):
+        # This decorator will wrap the pop2data function around data2 
+        @pop2data
+        def data2(l,r):
+            return np.maximum(l,r)
+
+RasterMax = RasterMax()
+
+# This lambda function is an unamed function that wraps up an object method.
+# This is the only way to make the __add/sub/mul__ overrides work unfortunately.
+Raster.__add__ = lambda l,r: RasterAdd.wrap(l,r) 
+Raster.__sub__ = lambda l,r: RasterSub.wrap(l,r) 
+Raster.__mul__ = lambda l,r: RasterMul.wrap(l,r) 
+Raster.__truediv__ = lambda l,r: RasterDiv.wrap(l,r) 
+
+def LocalSum(l,r):
+    return RasterAdd.wrap(l,r)
+def LocalMinimum(l,r):
+    return RasterMin.wrap(l,r)
+def LocalMaximum(l,r):
+    return RasterMax.wrap(l,r)
+
+'''
 
 # RFunct is an extended primitive where you can apply a function
 # to the left and right raster layers or just a single raster layer.
@@ -188,4 +271,5 @@ class HillShadePrim(Primitive):
         return out
 
 HillShade = HillShadePrim()
-        
+       
+''' 

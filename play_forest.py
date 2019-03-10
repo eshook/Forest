@@ -31,7 +31,8 @@ print(r2)
 print(r2.data)
 
 # Apply local sum and print out the results
-ro = LocalSum(r1,r2)
+#ro = LocalSum(r1,r2) # FIXME: LocalSum is no longer an option in the new rendition of Forest
+ro = r1+r2
 
 print(ro)
 print(ro.data)

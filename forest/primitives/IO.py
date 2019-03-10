@@ -5,6 +5,8 @@ Use of this source code is governed by a BSD-style license that can be found in 
 @contributors: (Jacob Arndt, arndt204@umn.edu; Luyi Hunter, chen3461@umn.edu; Xinran Duan, duanx138@umn.edu)
 """
 
+# FIXME: Need to add 'lazyread' option for parallel reads and only invoking read when needed.
+
 # FIXME: We need to have conditional imports here eventually
 from collections import OrderedDict
 #from osgeo import ogr,gdal,osr
@@ -17,6 +19,135 @@ from ..bobs.Bobs import *
 import numpy as np
 from dateutil.parser import parse
 import time
+
+class AsciiGridLoad(Primitive):
+    def __call__(self):
+        print("Open",self.filename)
+        fh = open(self.filename)
+        nrows = int(fh.readline().split()[1])
+        ncols = int(fh.readline().split()[1])
+        yllcorner = float(fh.readline().split()[1])
+        xllcorner = float(fh.readline().split()[1])
+        cellsize = float(fh.readline().split()[1])
+        nodata = float(fh.readline().split()[1])
+        fh.close()
+
+        print(nrows,ncols,yllcorner,xllcorner,cellsize,nodata)
+
+        bob = Raster(y=yllcorner, x=xllcorner, h=cellsize*nrows, w=cellsize*ncols, cellsize=cellsize, nrows=nrows, ncols=ncols, emptydata = True)
+
+        bob.data = np.loadtxt(self.filename, skiprows=6)
+
+        print("bobdata",bob.data)
+
+
+        Config.engine.stack.push(bob)
+
+    def file(self, filename):
+        self.filename = filename
+        print("load file",self.filename)
+        return self
+
+AsciiGridLoad = AsciiGridLoad()
+AGLoad = AsciiGridLoad
+
+class AsciiGridStore(Primitive):
+    def __call__(self):
+        bob = Config.engine.stack.pop()
+        print("Open for writing ",self.filename)
+        fh = open(self.filename,"w")
+        '''
+        fh.write("nrows        "+str(bob.nrows)+"\n")
+        fh.write("ncols        "+str(bob.ncols)+"\n")
+        fh.write("yllcorner    "+str(bob.y)+"\n")
+        fh.write("xllcorner    "+str(bob.x)+"\n")
+        fh.write("cellsize     "+str(bob.cellsize)+"\n")
+        fh.write("NODATA_value "+str(bob.nodatavalue)+"\n")
+        '''
+
+        fhwrite= "nrows        "+str(bob.nrows)+"\n"
+        fhwrite+="ncols        "+str(bob.ncols)+"\n"
+        fhwrite+="yllcorner    "+str(bob.y)+"\n"
+        fhwrite+="xllcorner    "+str(bob.x)+"\n"
+        fhwrite+="cellsize     "+str(bob.cellsize)+"\n"
+        fhwrite+="NODATA_value "+str(bob.nodatavalue)+""
+
+        np.savetxt(self.filename,bob.data,fmt='%.2f',header=fhwrite,comments="")
+        print("bobdata",bob.data)
+        fh.close()
+
+
+
+    def file(self, filename):
+        self.filename = filename
+        print("store file",self.filename)
+        return self
+
+AsciiGridStore = AsciiGridStore()
+AGStore = AsciiGridStore
+
+
+class GeotiffLoad(Primitive):
+    def __call__(self):
+        print("Call 1")
+
+        print("Open",self.filename)
+        ds = gdal.Open(self.filename)
+        if ds is None:
+            print("Open failed")
+        else: # ds is something
+            print("here")            
+            # Currently we only get the first band
+            band = ds.GetRasterBand(1)
+            ncols = ds.RasterXSize
+            nrows = ds.RasterYSize
+            print("Call 2")
+            if band is None:
+                print("Cannot read selected band in "+filename+" in ReadGeoTIFF")
+                raise(Exception)
+            
+            nodata_value = band.GetNoDataValue()
+            if nodata_value is None:
+                nodata_value=-9999
+            transform = ds.GetGeoTransform()
+            cellsize = transform[1]
+            origin_x = transform[0]
+            origin_y = transform[3]
+            x=origin_x
+            y=origin_y-nrows*cellsize
+            if(abs(transform[1])!=abs(transform[5])): # pixelwidth=1, pixelheight=5
+                print("[ ERROR ] Pixel width and height don't match") 
+    
+            h=float(nrows)*cellsize
+            w=float(ncols)*cellsize
+            bob=Raster(y,x,h,w,None,None,nrows,ncols,cellsize)
+        
+            bob.data=band.ReadAsArray(0,0,ncols,nrows) 
+            bob.filename = self.filename
+            bob.nodatavalue = nodata_value
+
+            ds.close()
+
+            # Cleanup
+            del transform
+            del band
+            del ds
+            transform=None
+            ds=None 
+            band=None
+
+            Config.engine.stack.push(bob)
+
+    def file(self, filename):
+        self.filename = filename
+        print("load file",self.filename)
+        return self
+    
+GeotiffLoad = GeotiffLoad()    
+
+
+################################## OLD 
+
 
 class RasterDataTestPrim(Primitive):
     def __init__(self):
