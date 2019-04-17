@@ -91,6 +91,114 @@ def LocalMinimum(l,r):
 def LocalMaximum(l,r):
     return RasterMax.wrap(l,r)
 
+
+
+
+## Brown Marmorated Stink Bug Related Raster Primitives
+
+
+# initialize_grid(MATRIX_SIZE) 
+class Initialize_grid(Primitive):
+    def __call__(self):
+         if not self.size:
+             self.size = 4 # By default you get a grid of 4x4
+
+         grid = Raster(h=self.size,w=self.size,nrows=self.size,ncols=self.size)
+
+         # Set seed
+         middle_cell = int(self.size/2)
+         grid.data[middle_cell][middle_cell] = 1
+
+         #return grid 
+         Config.engine.stack.push(grid)
+
+    # Save the size of the grid parameter
+    def size(self,size):
+         self.size = size
+         return self # Must still return self so there is something to call
+
+initialize_grid = Initialize_grid()
+
+# empty_grid() 
+class Empty_grid(Primitive):
+    def __call__(self):
+         if not self.size:
+             self.size = 4 # By default you get a grid of 4x4
+
+         grid = Raster(h=self.size,w=self.size,nrows=self.size,ncols=self.size)
+
+         #return grid 
+         Config.engine.stack.push(grid)
+
+    # Save the size of the grid parameter
+    def size(self,size):
+         self.size = size
+         return self # Must still return self so there is something to call
+
+empty_grid = Empty_grid()
+
+# initialize_kernel() 
+class Initialize_kernel(Primitive):
+    def __call__(self):
+         if not self.kernel:
+             self.kernel = "" # By default you get an empty string 
+
+         # Run kernel stuff
+         #kernel = kernel_code.format(MATRIX_SIZE, P_LOCAL, MATRIX_SIZE, P_NON_LOCAL)			# format kernel code w/ constants
+	 #mod = SourceModule(kernel)	
+
+         return None 
+
+    # Save the kernel string 
+    def kernel(self,kernel):
+         self.kernel = kernel 
+         return self # Must still return self so there is something to call
+
+initialize_kernel = Initialize_kernel()
+
+
+# local_diffusion() 
+class Local_diffusion(Primitive):
+    def __call__(self):
+
+        # This decorator will wrap the pop2data function around diff
+        # It will pop off 2 bobs and pass in only the data (GPU'ified arrays)
+        # It will push 2 bobs back on as GPU'ified arrays 
+        @pop2data2
+        def diff(gpu_grid_a,gpu_grid_b):
+            # f1 = mod.get_function("local_diffuse")	
+            # f1(gpu_grid_a, gpu_grid_b, randoms)	# call kernel function
+            gpu_grid_a, gpu_grid_b = gpu_grid_b, gpu_grid_a
+
+            return gpu_grid_a,gpu_grid_b 
+
+local_diffusion = Local_diffusion()
+
+# distance_diffusion() 
+class Non_local_diffusion(Primitive):
+    def __call__(self):
+
+        # This decorator will wrap the pop2data function around diff
+        # It will pop off 2 bobs and pass in only the data (GPU'ified arrays)
+        # It will push 2 bobs back on as GPU'ified arrays 
+        @pop2data2
+        def diff(gpu_grid_a,gpu_grid_b):
+            #f2 = mod.get_function("non_local_diffuse")		# non local diffusion function
+	    #randoms = random_floats()				# random value between [0,1)
+	    #x_coords, y_coords = random_coords()			# random grid coordinates
+	    #f2(gpu_grid_a, gpu_grid_b, randoms, x_coords, y_coords)	# call kernel function
+            gpu_grid_a, gpu_grid_b = gpu_grid_b, gpu_grid_a         # f1 = mod.get_function("local_diffuse")	
+
+            return gpu_grid_a,gpu_grid_b 
+
+non_local_diffusion = Non_local_diffusion()
+
+# write_grid("output.tif")
+# This already exists so it was modified
+
+
+
+
 '''
 
 # RFunct is an extended primitive where you can apply a function

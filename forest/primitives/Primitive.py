@@ -69,6 +69,17 @@ def pop2data(func):
     o.data = func(l.data,r.data)
     Config.engine.stack.push(o)
 
+# Pop 2 bobs off the data stack, copy top bob for output, apply function (func) to data of each bob, 
+# Save output to data of output 2 bobs, then push output bobs back on the stack
+def pop2data2(func):
+    l = Config.engine.stack.pop()
+    r = Config.engine.stack.pop()
+    o1 = copy.deepcopy(l)  # Make an output bob by copying the first bob on the stack (l)
+    o2 = copy.deepcopy(l)  # Make an output bob by copying the first bob on the stack (l)
+    o1.data,o2.data = func(l.data,r.data)
+    Config.engine.stack.push(o1)
+    Config.engine.stack.push(o2)
+
 # This function exposes the engine's run to the outside world.
 def run_primitive(op):
     return Config.engine.run(op)

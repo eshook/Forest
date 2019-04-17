@@ -558,11 +558,72 @@ class MultiprocessingEngine(Engine):
     
 mp_engine = MultiprocessingEngine()
 
+
+
+# CUDA Engine
+class CUDAEngine(Engine):
+
+    def __init__(self):
+        # FIXME: Need an object to describe type of engines rather than a string
+        super(CUDAEngine,self).__init__("CUDAEngine")
+        self.is_split=False
+        
+    def split(self):
+        # temp_stack = []
+        # while self.stack:
+        #      bob = stack.pop()
+        #      gpu_bob = gpuarray.to_gpu(bob)
+        #      temp_stack.push(gpu_bob)
+
+        # while temp_stack: # Push it all back onto the stack maintaining order
+        #     gpu_bob = temp_stack.pop()
+        #     stack.push(gpu_bob)
+        self.is_split = True
+        
+    # Merge (>)
+    def merge(self):
+        # Do the same thing as split, but in reverse. 
+        # Pop everything off the stack and move from GPU to CPU memory
+
+        # Now that everything is merged set split to be false
+        self.is_split = False
+
+    # Sequence (==)
+    def sequence(self):
+        # I don't think we need to do anything special in sequence for GPUs
+        pass
+
+    # This method will run a single primitive operation
+    def run(self, primitive):
+        print("Running", primitive)
+
+        # Get the name of the primitive operation being executed
+        name = primitive.__class__.__name__
+
+        # Check is_split, if running split then loop over split stacks
+        if self.is_split:
+            # Right now just run the primitive no matter what
+            primitive()
+        else:
+            # otherwise just run the primitive
+            primitive()
+
+    # The rest should be fine for us right now.
+
+cuda_engine = CUDAEngine()
+
+
+
+
+
+
+
 # Set the Config.engine as the default
 
 Config.engine = mp_engine
 Config.engine = tile_engine
 Config.engine = pass_engine
+Config.engine = cuda_engine
 
 print("Default engine",Config.engine)
 
