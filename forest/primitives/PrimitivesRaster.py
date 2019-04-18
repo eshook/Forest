@@ -11,6 +11,14 @@ from ..bobs.Bobs import *
 import math
 import numpy as np
 
+# PyCUDA imports
+import pycuda.autoinit
+import pycuda.driver as drv
+import pycuda.gpuarray as gpuarray
+import pycuda.curandom as curandom
+from pycuda.tools import DeviceData
+from pycuda.compiler import SourceModule
+
 # FIXME: Instead of making a class for each Primitive type
 #        we can make a pop2data wrapper as part of __init__ parameter
 #        that way you can create RasterAdd like this:
@@ -96,6 +104,13 @@ def LocalMaximum(l,r):
 
 ## Brown Marmorated Stink Bug Related Raster Primitives
 
+# constants
+MATRIX_SIZE = 128 # size of square grid
+BLOCK_DIMS = 4 # block dimensions
+GRID_DIMS = MATRIX_SIZE // BLOCK_DIMS
+P_LOCAL = 0.1 # probability of local diffusion
+P_NON_LOCAL = 0.25 # probability of non-local diffusion
+N_ITERS = 5 # number of iterations
 
 # initialize_grid(MATRIX_SIZE) 
 class Initialize_grid(Primitive):
@@ -140,18 +155,18 @@ empty_grid = Empty_grid()
 # initialize_kernel() 
 class Initialize_kernel(Primitive):
     def __call__(self):
-         if not self.kernel:
-             self.kernel = "" # By default you get an empty string 
+         if not self.kernel_code:
+             self.kernel_code = "" # By default you get an empty string 
 
          # Run kernel stuff
-         #kernel = kernel_code.format(MATRIX_SIZE, P_LOCAL, MATRIX_SIZE, P_NON_LOCAL)			# format kernel code w/ constants
-	 #mod = SourceModule(kernel)	
+         self.kernel = self.kernel_code.format(MATRIX_SIZE, P_LOCAL, MATRIX_SIZE, P_NON_LOCAL)			# format kernel code w/ constants
+         self.mod = SourceModule(self.kernel)	
 
          return None 
 
     # Save the kernel string 
-    def kernel(self,kernel):
-         self.kernel = kernel 
+    def kernel(self,code):
+         self.kernel_code = code
          return self # Must still return self so there is something to call
 
 initialize_kernel = Initialize_kernel()
@@ -166,8 +181,9 @@ class Local_diffusion(Primitive):
         # It will push 2 bobs back on as GPU'ified arrays 
         @pop2data2
         def diff(gpu_grid_a,gpu_grid_b):
-            # f1 = mod.get_function("local_diffuse")	
-            # f1(gpu_grid_a, gpu_grid_b, randoms)	# call kernel function
+            f1 = self.mod.get_function("local_diffuse")
+            randoms = curandom.rand((self.size, self.size))
+            f1(gpu_grid_a, gpu_grid_b, randoms, grid = (GRID_DIMS, GRID_DIMS, 1), block = (BLOCK_DIMS, BLOCK_DIMS, 1))
             gpu_grid_a, gpu_grid_b = gpu_grid_b, gpu_grid_a
 
             return gpu_grid_a,gpu_grid_b 
@@ -183,11 +199,12 @@ class Non_local_diffusion(Primitive):
         # It will push 2 bobs back on as GPU'ified arrays 
         @pop2data2
         def diff(gpu_grid_a,gpu_grid_b):
-            #f2 = mod.get_function("non_local_diffuse")		# non local diffusion function
-	    #randoms = random_floats()				# random value between [0,1)
-	    #x_coords, y_coords = random_coords()			# random grid coordinates
-	    #f2(gpu_grid_a, gpu_grid_b, randoms, x_coords, y_coords)	# call kernel function
-            gpu_grid_a, gpu_grid_b = gpu_grid_b, gpu_grid_a         # f1 = mod.get_function("local_diffuse")	
+            f2 = mod.get_function("non_local_diffuse")
+            randoms = curandom.rand((self.size, self.size))
+            rand_x_coords = ((curandom.rand((self.size, self.size))) * self.size).astype(np.int32)
+            rand_y_coords = ((curandom.rand((self.size, self.size))) * self.size).astype(np.int32)
+            f2(gpu_grid_a, gpu_grid_b, randoms, x_coords, y_coords, grid = (GRID_DIMS, GRID_DIMS, 1), block = (BLOCK_DIMS, BLOCK_DIMS, 1))
+            gpu_grid_a, gpu_grid_b = gpu_grid_b, gpu_grid_a	
 
             return gpu_grid_a,gpu_grid_b 
 

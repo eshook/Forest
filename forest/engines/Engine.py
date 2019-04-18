@@ -15,6 +15,14 @@ import multiprocessing
 import numpy as np
 import gdal
 
+# PyCUDA imports
+import pycuda.autoinit
+import pycuda.driver as drv
+import pycuda.gpuarray as gpuarray
+import pycuda.curandom as curandom
+from pycuda.tools import DeviceData
+from pycuda.compiler import SourceModule
+
 # This is a generic 'stack' data structure.
 class Stack(object):
     def __init__(self):
@@ -569,21 +577,31 @@ class CUDAEngine(Engine):
         self.is_split=False
         
     def split(self):
-        # temp_stack = []
-        # while self.stack:
-        #      bob = stack.pop()
-        #      gpu_bob = gpuarray.to_gpu(bob)
-        #      temp_stack.push(gpu_bob)
+        temp_stack = []
+        while self.stack:
+            bob = self.stack.pop()
+            gpu_bob = gpuarray.to_gpu(bob)
+            temp_stack.push(gpu_bob)
 
-        # while temp_stack: # Push it all back onto the stack maintaining order
-        #     gpu_bob = temp_stack.pop()
-        #     stack.push(gpu_bob)
+        while temp_stack: # Push it all back onto the stack maintaining order
+            gpu_bob = temp_stack.pop()
+            self.stack.push(gpu_bob)
+        
         self.is_split = True
         
     # Merge (>)
     def merge(self):
         # Do the same thing as split, but in reverse. 
         # Pop everything off the stack and move from GPU to CPU memory
+        temp_stack = []
+        while self.stack:
+            gpu_bob = self.stack.pop()
+            bob = gpu_bob.get()
+            temp_stack.push(bob)
+
+        while temp_stack:
+            bob = temp_stack.pop()
+            self.stack.push(bob)
 
         # Now that everything is merged set split to be false
         self.is_split = False
