@@ -578,12 +578,12 @@ class CUDAEngine(Engine):
         
     def split(self):
         temp_stack = []
-        while self.stack:
+        while self.stack.notempty():
             bob = self.stack.pop()
-            gpu_bob = gpuarray.to_gpu(bob)
-            temp_stack.push(gpu_bob)
+            gpu_bob = gpuarray.to_gpu(bob())
+            temp_stack.append(gpu_bob)
 
-        while temp_stack: # Push it all back onto the stack maintaining order
+        while len(temp_stack) > 0: # Push it all back onto the stack maintaining order
             gpu_bob = temp_stack.pop()
             self.stack.push(gpu_bob)
         
@@ -594,12 +594,12 @@ class CUDAEngine(Engine):
         # Do the same thing as split, but in reverse. 
         # Pop everything off the stack and move from GPU to CPU memory
         temp_stack = []
-        while self.stack:
+        while self.stack.notempty():
             gpu_bob = self.stack.pop()
             bob = gpu_bob.get()
-            temp_stack.push(bob)
+            temp_stack.append(bob)
 
-        while temp_stack:
+        while len(temp_stack) > 0:
             bob = temp_stack.pop()
             self.stack.push(bob)
 

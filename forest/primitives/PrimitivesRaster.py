@@ -101,16 +101,7 @@ def LocalMaximum(l,r):
 
 
 
-
 ## Brown Marmorated Stink Bug Related Raster Primitives
-
-# constants
-MATRIX_SIZE = 128 # size of square grid
-BLOCK_DIMS = 4 # block dimensions
-GRID_DIMS = MATRIX_SIZE // BLOCK_DIMS
-P_LOCAL = 0.1 # probability of local diffusion
-P_NON_LOCAL = 0.25 # probability of non-local diffusion
-N_ITERS = 5 # number of iterations
 
 # initialize_grid(MATRIX_SIZE) 
 class Initialize_grid(Primitive):
@@ -119,6 +110,7 @@ class Initialize_grid(Primitive):
              self.size = 4 # By default you get a grid of 4x4
 
          grid = Raster(h=self.size,w=self.size,nrows=self.size,ncols=self.size)
+         grid.data = grid.data.astype(np.float32)
 
          # Set seed
          middle_cell = int(self.size/2)
@@ -141,6 +133,7 @@ class Empty_grid(Primitive):
              self.size = 4 # By default you get a grid of 4x4
 
          grid = Raster(h=self.size,w=self.size,nrows=self.size,ncols=self.size)
+         grid.data = grid.data.astype(np.float32)
 
          #return grid 
          Config.engine.stack.push(grid)
@@ -158,9 +151,9 @@ class Initialize_kernel(Primitive):
          if not self.kernel_code:
              self.kernel_code = "" # By default you get an empty string 
 
-         # Run kernel stuff
-         self.kernel = self.kernel_code.format(MATRIX_SIZE, P_LOCAL, MATRIX_SIZE, P_NON_LOCAL)			# format kernel code w/ constants
-         self.mod = SourceModule(self.kernel)	
+         #Run kernel stuff
+         #self.kernel = self.kernel_code.format(MATRIX_SIZE, P_LOCAL, MATRIX_SIZE, P_NON_LOCAL)			# format kernel code w/ constants
+         #self.mod = SourceModule(self.kernel)
 
          return None 
 
@@ -171,7 +164,6 @@ class Initialize_kernel(Primitive):
 
 initialize_kernel = Initialize_kernel()
 
-
 # local_diffusion() 
 class Local_diffusion(Primitive):
     def __call__(self):
@@ -179,14 +171,25 @@ class Local_diffusion(Primitive):
         # This decorator will wrap the pop2data function around diff
         # It will pop off 2 bobs and pass in only the data (GPU'ified arrays)
         # It will push 2 bobs back on as GPU'ified arrays 
-        @pop2data2
+        @pop2data2gpu
         def diff(gpu_grid_a,gpu_grid_b):
-            f1 = self.mod.get_function("local_diffuse")
-            randoms = curandom.rand((self.size, self.size))
-            f1(gpu_grid_a, gpu_grid_b, randoms, grid = (GRID_DIMS, GRID_DIMS, 1), block = (BLOCK_DIMS, BLOCK_DIMS, 1))
+            print('Func called...')
+            print('GPU_GRID_A before f1 = ', gpu_grid_a)
+            print('GPU_GRID_B before f1 = ', gpu_grid_b)
+            self.randoms = curandom.rand((self.size, self.size))
+            self.action(gpu_grid_a, gpu_grid_b, self.randoms, grid = (self.grid_dims, self.grid_dims, 1), block = (self.block_dims, self.block_dims, 1))
+            print('GPU_GRID_A after f1 = ', gpu_grid_a)
+            print('GPU_GRID_B after f1 = ', gpu_grid_b)
             gpu_grid_a, gpu_grid_b = gpu_grid_b, gpu_grid_a
 
-            return gpu_grid_a,gpu_grid_b 
+            return gpu_grid_a,gpu_grid_b
+
+    def vars(self,f,s,g,b):
+        self.action = f
+        self.size = s
+        self.grid_dims = g
+        self.block_dims = b
+        return self
 
 local_diffusion = Local_diffusion()
 
@@ -197,16 +200,22 @@ class Non_local_diffusion(Primitive):
         # This decorator will wrap the pop2data function around diff
         # It will pop off 2 bobs and pass in only the data (GPU'ified arrays)
         # It will push 2 bobs back on as GPU'ified arrays 
-        @pop2data2
+        @pop2data2gpu
         def diff(gpu_grid_a,gpu_grid_b):
-            f2 = mod.get_function("non_local_diffuse")
-            randoms = curandom.rand((self.size, self.size))
-            rand_x_coords = ((curandom.rand((self.size, self.size))) * self.size).astype(np.int32)
-            rand_y_coords = ((curandom.rand((self.size, self.size))) * self.size).astype(np.int32)
-            f2(gpu_grid_a, gpu_grid_b, randoms, x_coords, y_coords, grid = (GRID_DIMS, GRID_DIMS, 1), block = (BLOCK_DIMS, BLOCK_DIMS, 1))
+            self.randoms = curandom.rand((self.size, self.size))
+            self.x_coords = ((curandom.rand((self.size, self.size))) * self.size).astype(np.int32)
+            self.y_coords = ((curandom.rand((self.size, self.size))) * self.size).astype(np.int32)
+            self.action(gpu_grid_a, gpu_grid_b, self.randoms, self.x_coords, self.y_coords, grid = (self.grid_dims, self.grid_dims, 1), block = (self.block_dims, self.block_dims, 1))
             gpu_grid_a, gpu_grid_b = gpu_grid_b, gpu_grid_a	
 
             return gpu_grid_a,gpu_grid_b 
+
+    def vars(self,f,s,g,b):
+        self.action = f
+        self.size = s
+        self.grid_dims = g
+        self.block_dims = b
+        return self
 
 non_local_diffusion = Non_local_diffusion()
 
