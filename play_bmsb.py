@@ -22,11 +22,11 @@ Config.engine = pass_engine
 Config.engine = cuda_engine
 print("Running Engine",Config.engine)
 
-MATRIX_SIZE = 8
-BLOCK_DIMS = 2 # CUDA block dimensions
-GRID_DIMS = MATRIX_SIZE // BLOCK_DIMS # CUDA grid dimensions
-P_LOCAL = 1.0 # probability of local diffusion
-P_NON_LOCAL = 0.25 # probability of non-local diffusion
+MATRIX_SIZE = 100
+BLOCK_DIMS = 8 # CUDA block dimensions
+GRID_DIMS = (MATRIX_SIZE + BLOCK_DIMS - 1) // BLOCK_DIMS # CUDA grid dimensions
+P_LOCAL = 0.50 # probability of local diffusion
+P_NON_LOCAL = 0.50 # probability of non-local diffusion
 N_ITERS = 5 # number of iterations
 CODE = """
     __global__ void local_diffuse(float* grid_a, float* grid_b, float* randoms)
@@ -36,45 +36,41 @@ CODE = """
 
         unsigned int x = threadIdx.x + blockIdx.x * blockDim.x;         // column element of index
         unsigned int y = threadIdx.y + blockIdx.y * blockDim.y;         // row element of index
-        unsigned int thread_id = y * grid_size + x;                     // thread index in array
 
-        // edges will be ignored as starting points
-        unsigned int edge = (x == 0) || (x == grid_size - 1) || (y == 0) || (y == grid_size - 1);
+        if (x < grid_size && y < grid_size) {{
 
-        printf("Local Diffusion\\t"
-            "Thread ID = %u\\t"
-            "Edge = %u\\t"
-            "Grid_a[thread_id] = %f\\t"
-            "Grid_b[thread_id] = %f\\t"
-            "Randoms[thread_id] = %f\\n",
-            thread_id, edge, grid_a[thread_id], grid_b[thread_id], randoms[thread_id]);
+            unsigned int thread_id = y * grid_size + x;                     // thread index in array
 
-        if (grid_a[thread_id] == 1) {{
-            grid_b[thread_id] = 1;                                      // current cell
-            if (!edge) {{
-                if (randoms[thread_id - grid_size] < prob) {{
-                    grid_b[thread_id - grid_size] = 1;                  // above
-                }}
-                if (randoms[thread_id - grid_size - 1] < prob) {{
-                    grid_b[thread_id - grid_size - 1] = 1;              // above and left
-                }}
-                if (randoms[thread_id - grid_size + 1] < prob) {{
-                    grid_b[thread_id - grid_size + 1] = 1;              // above and right
-                }}
-                if (randoms[thread_id + grid_size] < prob) {{
-                    grid_b[thread_id + grid_size] = 1;                  // below
-                }}
-                if (randoms[thread_id + grid_size - 1] < prob) {{
-                    grid_b[thread_id + grid_size - 1] = 1;              // below and left
-                }}
-                if (randoms[thread_id + grid_size + 1] < prob) {{
-                    grid_b[thread_id + grid_size + 1] = 1;              // below and right
-                }}
-                if (randoms[thread_id - 1] < prob) {{
-                    grid_b[thread_id - 1] = 1;                          // left
-                }}
-                if (randoms[thread_id + 1] < prob) {{
-                    grid_b[thread_id + 1] = 1;                          // right
+            // edges will be ignored as starting points
+            unsigned int edge = (x == 0) || (x == grid_size - 1) || (y == 0) || (y == grid_size - 1);
+
+            if (grid_a[thread_id] == 1) {{
+                grid_b[thread_id] = 1;                                      // current cell
+                if (!edge) {{
+                    if (randoms[thread_id - grid_size] < prob) {{
+                        grid_b[thread_id - grid_size] = 1;                  // above
+                    }}
+                    if (randoms[thread_id - grid_size - 1] < prob) {{
+                        grid_b[thread_id - grid_size - 1] = 1;              // above and left
+                    }}
+                    if (randoms[thread_id - grid_size + 1] < prob) {{
+                        grid_b[thread_id - grid_size + 1] = 1;              // above and right
+                    }}
+                    if (randoms[thread_id + grid_size] < prob) {{
+                        grid_b[thread_id + grid_size] = 1;                  // below
+                    }}
+                    if (randoms[thread_id + grid_size - 1] < prob) {{
+                        grid_b[thread_id + grid_size - 1] = 1;              // below and left
+                    }}
+                    if (randoms[thread_id + grid_size + 1] < prob) {{
+                        grid_b[thread_id + grid_size + 1] = 1;              // below and right
+                    }}
+                    if (randoms[thread_id - 1] < prob) {{
+                        grid_b[thread_id - 1] = 1;                          // left
+                    }}
+                    if (randoms[thread_id + 1] < prob) {{
+                        grid_b[thread_id + 1] = 1;                          // right
+                    }}
                 }}
             }}
         }}
@@ -87,22 +83,17 @@ CODE = """
 
         unsigned int x = threadIdx.x + blockIdx.x * blockDim.x;         // column element of index
         unsigned int y = threadIdx.y + blockIdx.y * blockDim.y;         // row element of index
-        unsigned int thread_id = y * grid_size + x;                     // thread index in array
 
-        printf("Non-Local Diffusion\\t"
-            "Thread ID = %u\\t"
-            "Grid_a[thread_id] = %f\\t"
-            "Grid_b[thread_id] = %f\\t"
-            "Randoms[thread_id] = %f\\t"
-            "X_coords[thread_id] = %i\\t"
-            "Y_coords[thread_id] = %i\\n",
-            thread_id, grid_a[thread_id], grid_b[thread_id], randoms[thread_id], x_coords[thread_id], y_coords[thread_id]);
+        if (x < grid_size && y < grid_size) {{
 
-        if (grid_a[thread_id] == 1) {{
-            grid_b[thread_id] = 1;                                  // current cell
-            if (randoms[thread_id] < prob) {{
-                unsigned int spread_index = y_coords[thread_id] * grid_size + x_coords[thread_id];
-                grid_b[spread_index] = 1;
+            unsigned int thread_id = y * grid_size + x;                     // thread index in array
+
+            if (grid_a[thread_id] == 1) {{
+                grid_b[thread_id] = 1;                                  // current cell
+                if (randoms[thread_id] < prob) {{
+                    unsigned int spread_index = y_coords[thread_id] * grid_size + x_coords[thread_id];
+                    grid_b[spread_index] = 1;
+                }}
             }}
         }}
     }}

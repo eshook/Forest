@@ -574,12 +574,14 @@ class CUDAEngine(Engine):
     def __init__(self):
         # FIXME: Need an object to describe type of engines rather than a string
         super(CUDAEngine,self).__init__("CUDAEngine")
+        self.bob_stack = Stack()
         self.is_split=False
         
     def split(self):
         temp_stack = []
         while self.stack.notempty():
             bob = self.stack.pop()
+            self.bob_stack.push(bob)
             gpu_bob = gpuarray.to_gpu(bob())
             temp_stack.append(gpu_bob)
 

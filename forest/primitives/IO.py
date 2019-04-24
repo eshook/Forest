@@ -53,7 +53,12 @@ AGLoad = AsciiGridLoad
 
 class AsciiGridStore(Primitive):
     def __call__(self):
-        bob = Config.engine.stack.pop()
+        if Config.engine.engine_type == "CUDAEngine":
+            bob = Config.engine.bob_stack.pop()
+            bob_data = Config.engine.stack.pop()
+            bob.data = bob_data
+        else:
+            bob = Config.engine.stack.pop()
         print("Open for writing ",self.filename)
         fh = open(self.filename,"w")
         '''

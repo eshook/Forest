@@ -115,6 +115,7 @@ class Initialize_grid(Primitive):
          # Set seed
          middle_cell = int(self.size/2)
          grid.data[middle_cell][middle_cell] = 1
+         #grid.data[self.size-1][self.size-1] = 1
 
          #return grid 
          Config.engine.stack.push(grid)
@@ -145,25 +146,6 @@ class Empty_grid(Primitive):
 
 empty_grid = Empty_grid()
 
-# initialize_kernel() 
-class Initialize_kernel(Primitive):
-    def __call__(self):
-         if not self.kernel_code:
-             self.kernel_code = "" # By default you get an empty string 
-
-         #Run kernel stuff
-         #self.kernel = self.kernel_code.format(MATRIX_SIZE, P_LOCAL, MATRIX_SIZE, P_NON_LOCAL)			# format kernel code w/ constants
-         #self.mod = SourceModule(self.kernel)
-
-         return None 
-
-    # Save the kernel string 
-    def kernel(self,code):
-         self.kernel_code = code
-         return self # Must still return self so there is something to call
-
-initialize_kernel = Initialize_kernel()
-
 # local_diffusion() 
 class Local_diffusion(Primitive):
     def __call__(self):
@@ -173,13 +155,8 @@ class Local_diffusion(Primitive):
         # It will push 2 bobs back on as GPU'ified arrays 
         @pop2data2gpu
         def diff(gpu_grid_a,gpu_grid_b):
-            print('Func called...')
-            print('GPU_GRID_A before f1 = ', gpu_grid_a)
-            print('GPU_GRID_B before f1 = ', gpu_grid_b)
             self.randoms = curandom.rand((self.size, self.size))
             self.action(gpu_grid_a, gpu_grid_b, self.randoms, grid = (self.grid_dims, self.grid_dims, 1), block = (self.block_dims, self.block_dims, 1))
-            print('GPU_GRID_A after f1 = ', gpu_grid_a)
-            print('GPU_GRID_B after f1 = ', gpu_grid_b)
             gpu_grid_a, gpu_grid_b = gpu_grid_b, gpu_grid_a
 
             return gpu_grid_a,gpu_grid_b
