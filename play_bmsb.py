@@ -22,7 +22,8 @@ Config.engine = pass_engine
 Config.engine = cuda_engine
 print("Running Engine",Config.engine)
 
-MATRIX_SIZE = 100
+# Constants
+MATRIX_SIZE = 100 # Size of square grid
 BLOCK_DIMS = 8 # CUDA block dimensions
 GRID_DIMS = (MATRIX_SIZE + BLOCK_DIMS - 1) // BLOCK_DIMS # CUDA grid dimensions
 P_LOCAL = 0.50 # probability of local diffusion
@@ -34,8 +35,8 @@ CODE = """
         unsigned int grid_size = {};
         float prob = {};
 
-        unsigned int x = threadIdx.x + blockIdx.x * blockDim.x;         // column element of index
-        unsigned int y = threadIdx.y + blockIdx.y * blockDim.y;         // row element of index
+        unsigned int x = threadIdx.x + blockIdx.x * blockDim.x;             // column element of index
+        unsigned int y = threadIdx.y + blockIdx.y * blockDim.y;             // row element of index
 
         if (x < grid_size && y < grid_size) {{
 
@@ -81,15 +82,15 @@ CODE = """
         unsigned int grid_size = {};
         float prob = {};
 
-        unsigned int x = threadIdx.x + blockIdx.x * blockDim.x;         // column element of index
-        unsigned int y = threadIdx.y + blockIdx.y * blockDim.y;         // row element of index
+        unsigned int x = threadIdx.x + blockIdx.x * blockDim.x;             // column element of index
+        unsigned int y = threadIdx.y + blockIdx.y * blockDim.y;             // row element of index
 
         if (x < grid_size && y < grid_size) {{
 
             unsigned int thread_id = y * grid_size + x;                     // thread index in array
 
             if (grid_a[thread_id] == 1) {{
-                grid_b[thread_id] = 1;                                  // current cell
+                grid_b[thread_id] = 1;                                      // current cell
                 if (randoms[thread_id] < prob) {{
                     unsigned int spread_index = y_coords[thread_id] * grid_size + x_coords[thread_id];
                     grid_b[spread_index] = 1;
@@ -98,8 +99,12 @@ CODE = """
         }}
     }}
 """
+
+# Format code with constants and compile kernel
 KERNEL_CODE = CODE.format(MATRIX_SIZE, P_LOCAL, MATRIX_SIZE, P_NON_LOCAL)
 MOD = SourceModule(KERNEL_CODE)
+
+# Get local and non-local diffusion functions from kernel
 LOCAL = MOD.get_function('local_diffuse')
 NON_LOCAL = MOD.get_function('non_local_diffuse')
 

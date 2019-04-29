@@ -578,6 +578,8 @@ class CUDAEngine(Engine):
         self.is_split=False
         
     def split(self):
+        # Pop everything off the stack and move from CPU to GPU memory
+        # Self.bob_stack contains bobs. Self.stack contains data
         temp_stack = []
         while self.stack.notempty():
             bob = self.stack.pop()
@@ -585,10 +587,12 @@ class CUDAEngine(Engine):
             gpu_bob = gpuarray.to_gpu(bob())
             temp_stack.append(gpu_bob)
 
-        while len(temp_stack) > 0: # Push it all back onto the stack maintaining order
+        # Push data back onto stack to maintain order
+        while len(temp_stack) > 0:
             gpu_bob = temp_stack.pop()
             self.stack.push(gpu_bob)
         
+        # Data is split so set split to be true
         self.is_split = True
         
     # Merge (>)
@@ -601,6 +605,7 @@ class CUDAEngine(Engine):
             bob = gpu_bob.get()
             temp_stack.append(bob)
 
+        # Push data back onto stack to maintain order
         while len(temp_stack) > 0:
             bob = temp_stack.pop()
             self.stack.push(bob)

@@ -53,7 +53,9 @@ AGLoad = AsciiGridLoad
 
 class AsciiGridStore(Primitive):
     def __call__(self):
-        if Config.engine.engine_type == "CUDAEngine":
+
+        # If CUDAEngine, bobs and their data are stored on separate stacks
+        if Config.engine.engine_type == "CUDAEngine":  
             bob = Config.engine.bob_stack.pop()
             bob_data = Config.engine.stack.pop()
             bob.data = bob_data

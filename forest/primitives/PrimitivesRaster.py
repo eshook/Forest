@@ -109,13 +109,13 @@ class Initialize_grid(Primitive):
          if not self.size:
              self.size = 4 # By default you get a grid of 4x4
 
+         # Create grid and convert data to np.float32 (necessary for GPU computation)
          grid = Raster(h=self.size,w=self.size,nrows=self.size,ncols=self.size)
          grid.data = grid.data.astype(np.float32)
 
          # Set seed
          middle_cell = int(self.size/2)
          grid.data[middle_cell][middle_cell] = 1
-         #grid.data[self.size-1][self.size-1] = 1
 
          #return grid 
          Config.engine.stack.push(grid)
@@ -133,6 +133,7 @@ class Empty_grid(Primitive):
          if not self.size:
              self.size = 4 # By default you get a grid of 4x4
 
+         # Create grid and convert data to np.float32 (necessary for GPU computation)
          grid = Raster(h=self.size,w=self.size,nrows=self.size,ncols=self.size)
          grid.data = grid.data.astype(np.float32)
 
@@ -151,8 +152,8 @@ class Local_diffusion(Primitive):
     def __call__(self):
 
         # This decorator will wrap the pop2data function around diff
-        # It will pop off 2 bobs and pass in only the data (GPU'ified arrays)
-        # It will push 2 bobs back on as GPU'ified arrays 
+        # It will pop off data (GPU'ified arrays), apply diff, and push data back onto stack
+        # Randoms are numbers between [0,1) used in the diffusion kernel
         @pop2data2gpu
         def diff(gpu_grid_a,gpu_grid_b):
             self.randoms = curandom.rand((self.size, self.size))
@@ -161,6 +162,7 @@ class Local_diffusion(Primitive):
 
             return gpu_grid_a,gpu_grid_b
 
+    # Save kernel function, matrix size, grid size, and block size
     def vars(self,f,s,g,b):
         self.action = f
         self.size = s
@@ -175,8 +177,9 @@ class Non_local_diffusion(Primitive):
     def __call__(self):
 
         # This decorator will wrap the pop2data function around diff
-        # It will pop off 2 bobs and pass in only the data (GPU'ified arrays)
-        # It will push 2 bobs back on as GPU'ified arrays 
+        # It will pop off data (GPU'ified arrays), apply diff, and push data back onto stack
+        # Randoms are numbers between [0,1) used in the diffusion kernel
+        # X_coords, Y_coords are used to decide non-local diffusion location
         @pop2data2gpu
         def diff(gpu_grid_a,gpu_grid_b):
             self.randoms = curandom.rand((self.size, self.size))
@@ -187,6 +190,7 @@ class Non_local_diffusion(Primitive):
 
             return gpu_grid_a,gpu_grid_b 
 
+    # Save kernel function, matrix size, grid size, and block size
     def vars(self,f,s,g,b):
         self.action = f
         self.size = s

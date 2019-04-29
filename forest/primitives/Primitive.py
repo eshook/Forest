@@ -80,13 +80,11 @@ def pop2data2(func):
     Config.engine.stack.push(o1)
     Config.engine.stack.push(o2)
 
-# Pop 2 bobs off the data stack, copy top bob for output, apply function (func) to data of each bob, 
-# Save output to data of output 2 bobs, then push output bobs back on the stack
+# Pop data of 2 bobs off the data stack, apply function (func) to data, 
+# Save output data, then push data back on the stack
 def pop2data2gpu(func):
     l = Config.engine.stack.pop()
     r = Config.engine.stack.pop()
-    #o1 = copy.deepcopy(l)  # Make an output bob by copying the first bob on the stack (l)
-    #o2 = copy.deepcopy(r)  # Make an output bob by copying the first bob on the stack (l)
     o1,o2 = func(l,r)
     Config.engine.stack.push(o2)
     Config.engine.stack.push(o1)
