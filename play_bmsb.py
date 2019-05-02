@@ -38,6 +38,7 @@ CODE = """
         unsigned int x = threadIdx.x + blockIdx.x * blockDim.x;             // column element of index
         unsigned int y = threadIdx.y + blockIdx.y * blockDim.y;             // row element of index
 
+        // make sure cell is within the grid dimensions
         if (x < grid_size && y < grid_size) {{
 
             unsigned int thread_id = y * grid_size + x;                     // thread index in array
@@ -45,6 +46,7 @@ CODE = """
             // edges will be ignored as starting points
             unsigned int edge = (x == 0) || (x == grid_size - 1) || (y == 0) || (y == grid_size - 1);
 
+            // only look at this cell if it's already a 1
             if (grid_a[thread_id] == 1) {{
                 grid_b[thread_id] = 1;                                      // current cell
                 if (!edge) {{
@@ -85,10 +87,12 @@ CODE = """
         unsigned int x = threadIdx.x + blockIdx.x * blockDim.x;             // column element of index
         unsigned int y = threadIdx.y + blockIdx.y * blockDim.y;             // row element of index
 
+        // make sure cell is within the grid dimensions
         if (x < grid_size && y < grid_size) {{
 
             unsigned int thread_id = y * grid_size + x;                     // thread index in array
 
+            // only look at this cell if its already a 1
             if (grid_a[thread_id] == 1) {{
                 grid_b[thread_id] = 1;                                      // current cell
                 if (randoms[thread_id] < prob) {{
