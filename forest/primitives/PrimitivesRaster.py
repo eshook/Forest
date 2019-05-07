@@ -156,8 +156,7 @@ class Local_diffusion(Primitive):
         # Randoms are numbers between [0,1) used in the diffusion kernel
         @pop2data2gpu
         def diff(gpu_grid_a,gpu_grid_b):
-            self.randoms = curandom.rand((self.size, self.size))
-            self.action(gpu_grid_a, gpu_grid_b, self.randoms, grid = (self.grid_dims, self.grid_dims, 1), block = (self.block_dims, self.block_dims, 1))
+            self.action(gpu_grid_a, gpu_grid_b, Config.engine.generator.state, grid = (self.grid_dims, self.grid_dims, 1), block = (self.block_dims, self.block_dims, 1))
             gpu_grid_a, gpu_grid_b = gpu_grid_b, gpu_grid_a
 
             return gpu_grid_a,gpu_grid_b
@@ -182,10 +181,7 @@ class Non_local_diffusion(Primitive):
         # X_coords, Y_coords are used to decide non-local diffusion location
         @pop2data2gpu
         def diff(gpu_grid_a,gpu_grid_b):
-            self.randoms = curandom.rand((self.size, self.size))
-            self.x_coords = ((curandom.rand((self.size, self.size))) * self.size).astype(np.int32)
-            self.y_coords = ((curandom.rand((self.size, self.size))) * self.size).astype(np.int32)
-            self.action(gpu_grid_a, gpu_grid_b, self.randoms, self.x_coords, self.y_coords, grid = (self.grid_dims, self.grid_dims, 1), block = (self.block_dims, self.block_dims, 1))
+            self.action(gpu_grid_a, gpu_grid_b, Config.engine.generator.state, grid = (self.grid_dims, self.grid_dims, 1), block = (self.block_dims, self.block_dims, 1))
             gpu_grid_a, gpu_grid_b = gpu_grid_b, gpu_grid_a	
 
             return gpu_grid_a,gpu_grid_b 

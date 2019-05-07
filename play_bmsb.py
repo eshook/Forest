@@ -30,83 +30,129 @@ P_LOCAL = 0.50 # probability of local diffusion
 P_NON_LOCAL = 0.50 # probability of non-local diffusion
 N_ITERS = 5 # number of iterations
 CODE = """
-    __global__ void local_diffuse(float* grid_a, float* grid_b, float* randoms)
+    #include <curand_kernel.h>
+    #include <math.h>
+
+    extern "C" {{
+
+    __global__ void local_diffuse(float* grid_a, float* grid_b, curandState* global_state)
     {{
+
         unsigned int grid_size = {};
         float prob = {};
 
         unsigned int x = threadIdx.x + blockIdx.x * blockDim.x;             // column element of index
         unsigned int y = threadIdx.y + blockIdx.y * blockDim.y;             // row element of index
 
-        // make sure cell is within the grid dimensions
+        // make sure the the current thread is within bounds of grid
         if (x < grid_size && y < grid_size) {{
 
-            unsigned int thread_id = y * grid_size + x;                     // thread index in array
-
-            // edges will be ignored as starting points
+            unsigned int thread_id = y * grid_size + x;                     // thread index
+            float num;
             unsigned int edge = (x == 0) || (x == grid_size - 1) || (y == 0) || (y == grid_size - 1);
 
-            // only look at this cell if it's already a 1
+            // ignore cell if it is not already populated
             if (grid_a[thread_id] == 1) {{
+
                 grid_b[thread_id] = 1;                                      // current cell
+
+                // edges are ignored as starting points
                 if (!edge) {{
-                    if (randoms[thread_id - grid_size] < prob) {{
+
+                    curandState local_state = global_state[thread_id];      // state of thread's generator
+                    num = curand_uniform(&local_state);
+                    if (num < prob) {{
                         grid_b[thread_id - grid_size] = 1;                  // above
                     }}
-                    if (randoms[thread_id - grid_size - 1] < prob) {{
+
+                    num = curand_uniform(&local_state);
+                    if (num < prob) {{
                         grid_b[thread_id - grid_size - 1] = 1;              // above and left
                     }}
-                    if (randoms[thread_id - grid_size + 1] < prob) {{
+
+                    num = curand_uniform(&local_state);
+                    if (num < prob) {{
                         grid_b[thread_id - grid_size + 1] = 1;              // above and right
                     }}
-                    if (randoms[thread_id + grid_size] < prob) {{
+
+                    num = curand_uniform(&local_state);
+                    if (num < prob) {{
                         grid_b[thread_id + grid_size] = 1;                  // below
                     }}
-                    if (randoms[thread_id + grid_size - 1] < prob) {{
+
+                    num = curand_uniform(&local_state);
+                    if (num < prob) {{
                         grid_b[thread_id + grid_size - 1] = 1;              // below and left
                     }}
-                    if (randoms[thread_id + grid_size + 1] < prob) {{
+
+                    num = curand_uniform(&local_state);
+                    if (num < prob) {{
                         grid_b[thread_id + grid_size + 1] = 1;              // below and right
                     }}
-                    if (randoms[thread_id - 1] < prob) {{
+
+                    num = curand_uniform(&local_state);
+                    if (num < prob) {{
                         grid_b[thread_id - 1] = 1;                          // left
                     }}
-                    if (randoms[thread_id + 1] < prob) {{
+
+                    num = curand_uniform(&local_state);
+                    if (num < prob) {{
                         grid_b[thread_id + 1] = 1;                          // right
                     }}
+
+                    global_state[thread_id] = local_state;                  // save new generator state
                 }}
             }}
         }}
     }}
 
-    __global__ void non_local_diffuse(float* grid_a, float* grid_b, float* randoms, int* x_coords, int* y_coords)
-    {{
+    __global__ void non_local_diffuse(float* grid_a, float* grid_b, curandState* global_state) {{
+
         unsigned int grid_size = {};
         float prob = {};
 
-        unsigned int x = threadIdx.x + blockIdx.x * blockDim.x;             // column element of index
+        unsigned int x = threadIdx.x + blockIdx.x * blockDim.x;             // column index of element
         unsigned int y = threadIdx.y + blockIdx.y * blockDim.y;             // row element of index
 
-        // make sure cell is within the grid dimensions
+        // make sure the the current thread is within bounds of grid
         if (x < grid_size && y < grid_size) {{
 
-            unsigned int thread_id = y * grid_size + x;                     // thread index in array
+            unsigned int thread_id = y * grid_size + x;                     // thread index
+            float num;
+            unsigned int x_coord;
+            unsigned int y_coord;
+            unsigned int spread_index;
 
-            // only look at this cell if its already a 1
+            // ignore cell if it is not already populated
             if (grid_a[thread_id] == 1) {{
+
                 grid_b[thread_id] = 1;                                      // current cell
-                if (randoms[thread_id] < prob) {{
-                    unsigned int spread_index = y_coords[thread_id] * grid_size + x_coords[thread_id];
+
+                curandState local_state = global_state[thread_id];          // state of thread's generator
+                num = curand_uniform(&local_state);
+
+                // non-local diffusion occurs until a num > prob is randomly generated
+                while (num < prob) {{
+
+                    // scale to grid dimensions
+                    x_coord = (int) truncf(curand_uniform(&local_state) * (grid_size - 0.000001));
+                    y_coord = (int) truncf(curand_uniform(&local_state) * (grid_size - 0.000001));
+                    spread_index = y_coord * grid_size + x_coord;
+
+                    // printf("Thread_ID  = %u\\tNum = %f\\tY_coord = %u\\tX_coord = %u\\n", thread_id, num, y_coord, x_coord);
                     grid_b[spread_index] = 1;
+                    num = curand_uniform(&local_state);
                 }}
+                global_state[thread_id] = local_state;                      // save new generator state
             }}
         }}
+    }}
     }}
 """
 
 # Format code with constants and compile kernel
 KERNEL_CODE = CODE.format(MATRIX_SIZE, P_LOCAL, MATRIX_SIZE, P_NON_LOCAL)
-MOD = SourceModule(KERNEL_CODE)
+MOD = SourceModule(KERNEL_CODE, no_extern_c = True)
 
 # Get local and non-local diffusion functions from kernel
 LOCAL = MOD.get_function('local_diffuse')

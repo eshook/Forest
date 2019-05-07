@@ -575,6 +575,7 @@ class CUDAEngine(Engine):
         # FIXME: Need an object to describe type of engines rather than a string
         super(CUDAEngine,self).__init__("CUDAEngine")
         self.bob_stack = Stack()
+        self.generator = curandom.XORWOWRandomNumberGenerator() # psuedorandom numbers
         self.is_split=False
         
     def split(self):
