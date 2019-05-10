@@ -52,9 +52,9 @@ CODE = """
             unsigned int edge = (x == 0) || (x == grid_size - 1) || (y == 0) || (y == grid_size - 1);
 
             // ignore cell if it is not already populated
-            if (grid_a[thread_id] == 1) {{
+            if (grid_a[thread_id] > 0) {{
 
-                grid_b[thread_id] = 1;                                      // current cell
+                grid_b[thread_id] = grid_a[thread_id];                      // current cell
 
                 // edges are ignored as starting points
                 if (!edge) {{
@@ -62,42 +62,42 @@ CODE = """
                     curandState local_state = global_state[thread_id];      // state of thread's generator
                     num = curand_uniform(&local_state);
                     if (num < prob) {{
-                        grid_b[thread_id - grid_size] = 1;                  // above
+                        grid_b[thread_id - grid_size] += 1;                  // above
                     }}
 
                     num = curand_uniform(&local_state);
                     if (num < prob) {{
-                        grid_b[thread_id - grid_size - 1] = 1;              // above and left
+                        grid_b[thread_id - grid_size - 1] += 1;              // above and left
                     }}
 
                     num = curand_uniform(&local_state);
                     if (num < prob) {{
-                        grid_b[thread_id - grid_size + 1] = 1;              // above and right
+                        grid_b[thread_id - grid_size + 1] += 1;              // above and right
                     }}
 
                     num = curand_uniform(&local_state);
                     if (num < prob) {{
-                        grid_b[thread_id + grid_size] = 1;                  // below
+                        grid_b[thread_id + grid_size] += 1;                  // below
                     }}
 
                     num = curand_uniform(&local_state);
                     if (num < prob) {{
-                        grid_b[thread_id + grid_size - 1] = 1;              // below and left
+                        grid_b[thread_id + grid_size - 1] += 1;              // below and left
                     }}
 
                     num = curand_uniform(&local_state);
                     if (num < prob) {{
-                        grid_b[thread_id + grid_size + 1] = 1;              // below and right
+                        grid_b[thread_id + grid_size + 1] += 1;              // below and right
                     }}
 
                     num = curand_uniform(&local_state);
                     if (num < prob) {{
-                        grid_b[thread_id - 1] = 1;                          // left
+                        grid_b[thread_id - 1] += 1;                          // left
                     }}
 
                     num = curand_uniform(&local_state);
                     if (num < prob) {{
-                        grid_b[thread_id + 1] = 1;                          // right
+                        grid_b[thread_id + 1] += 1;                          // right
                     }}
 
                     global_state[thread_id] = local_state;                  // save new generator state
@@ -124,9 +124,9 @@ CODE = """
             unsigned int spread_index;
 
             // ignore cell if it is not already populated
-            if (grid_a[thread_id] == 1) {{
+            if (grid_a[thread_id] > 0) {{
 
-                grid_b[thread_id] = 1;                                      // current cell
+                grid_b[thread_id] = grid_a[thread_id];                      // current cell
 
                 curandState local_state = global_state[thread_id];          // state of thread's generator
                 num = curand_uniform(&local_state);
@@ -140,7 +140,7 @@ CODE = """
                     spread_index = y_coord * grid_size + x_coord;
 
                     // printf("Thread_ID  = %u\\tNum = %f\\tY_coord = %u\\tX_coord = %u\\n", thread_id, num, y_coord, x_coord);
-                    grid_b[spread_index] = 1;
+                    grid_b[spread_index] += 1;
                     num = curand_uniform(&local_state);
                 }}
                 global_state[thread_id] = local_state;                      // save new generator state
