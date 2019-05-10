@@ -9,6 +9,8 @@ Use of this source code is governed by a BSD-style license that can be found in 
 from ..bobs.Bob import *
 from ..bobs.Bobs import *
 from . import Config
+from ..primitives.PrimitivesRaster import bmsb_stop
+import copy
 import math
 import multiprocessing
 
@@ -41,6 +43,28 @@ class Stack(object):
 
     def __repr__(self):
         return "Stack("+str(len(self.stack))+")"
+
+class Queue(object):
+    def __init__(self):
+        self.queue = []
+
+    def enqueue(self,entity):
+        print("ENQUEUE",entity)
+        return self.queue.insert(0,entity)
+
+    def dequeue(self):
+        print("DEQUEUE")
+        return self.queue.pop()
+
+    def notempty(self):
+        return len(self.queue)>0
+
+    def size(self):
+        return len(self.queue)
+
+    def __repr__(self):
+        return "Queue"+str(len(self.queue))+")"
+
 
 class Engine(object):
     def __init__(self, engine_type):
@@ -575,21 +599,24 @@ class CUDAEngine(Engine):
         # FIXME: Need an object to describe type of engines rather than a string
         super(CUDAEngine,self).__init__("CUDAEngine")
         self.bob_stack = Stack()
+        self.queue = Queue()
         self.generator = curandom.XORWOWRandomNumberGenerator() # psuedorandom numbers
-        self.is_split=False
+        self.continue_cycle = False
+        self.n_iters = 0 # number of iterations to run
+        self.iters = 0 # number of iterations already run
         
     def split(self):
         # Pop everything off the stack and move from CPU to GPU memory
         # Self.bob_stack contains bobs. Self.stack contains data
-        temp_stack = []
+        temp_stack = Stack()
         while self.stack.notempty():
             bob = self.stack.pop()
             self.bob_stack.push(bob)
             gpu_bob = gpuarray.to_gpu(bob())
-            temp_stack.append(gpu_bob)
+            temp_stack.push(gpu_bob)
 
         # Push data back onto stack to maintain order
-        while len(temp_stack) > 0:
+        while temp_stack.notempty():
             gpu_bob = temp_stack.pop()
             self.stack.push(gpu_bob)
         
@@ -600,14 +627,14 @@ class CUDAEngine(Engine):
     def merge(self):
         # Do the same thing as split, but in reverse. 
         # Pop everything off the stack and move from GPU to CPU memory
-        temp_stack = []
+        temp_stack = Stack()
         while self.stack.notempty():
             gpu_bob = self.stack.pop()
             bob = gpu_bob.get()
-            temp_stack.append(bob)
+            temp_stack.push(bob)
 
         # Push data back onto stack to maintain order
-        while len(temp_stack) > 0:
+        while temp_stack.notempty():
             bob = temp_stack.pop()
             self.stack.push(bob)
 
@@ -616,8 +643,25 @@ class CUDAEngine(Engine):
 
     # Sequence (==)
     def sequence(self):
-        # I don't think we need to do anything special in sequence for GPUs
         pass
+
+    # Cycle Start (<=)
+    def cycle_start(self):
+        self.split()
+        self.continue_cycle = True
+
+    # Cycle Stop (>=)
+    def cycle_termination(self):
+        while self.continue_cycle == True:
+            copy_queue = Queue()
+            while self.queue.notempty():
+                prim = self.queue.dequeue()
+                copy_queue.enqueue(prim)
+                self.run(prim)
+            self.queue = copy_queue
+            bmsb_stop
+        self.merge()
+
 
     # This method will run a single primitive operation
     def run(self, primitive):
@@ -625,6 +669,9 @@ class CUDAEngine(Engine):
 
         # Get the name of the primitive operation being executed
         name = primitive.__class__.__name__
+
+        if self.continue_cycle == True and self.iters == 0:
+            self.queue.enqueue(primitive)
 
         # Check is_split, if running split then loop over split stacks
         if self.is_split:
@@ -634,7 +681,6 @@ class CUDAEngine(Engine):
             # otherwise just run the primitive
             primitive()
 
-    # The rest should be fine for us right now.
 
 cuda_engine = CUDAEngine()
 

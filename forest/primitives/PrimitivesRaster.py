@@ -167,7 +167,7 @@ class Local_diffusion(Primitive):
         self.size = s
         self.grid_dims = g
         self.block_dims = b
-        return self
+        return self # Must still return self so there is something to call
 
 local_diffusion = Local_diffusion()
 
@@ -192,9 +192,28 @@ class Non_local_diffusion(Primitive):
         self.size = s
         self.grid_dims = g
         self.block_dims = b
-        return self
+        return self # Must still return self so there is something to call
 
 non_local_diffusion = Non_local_diffusion()
+
+class Bmsb_stop_condition(Primitive):
+    def __call__(self):
+        Config.engine.n_iters = self.n_iters # set number of iterations to run
+
+    def vars(self, n):
+        self.n_iters = n
+        return self # Must still return self so there is something to call
+
+bmsb_stop_condition = Bmsb_stop_condition()
+
+class Bmsb_stop(Primitive):
+    def __call__(self):
+        Config.engine.iters += 1 # increment iteration counter
+        if Config.engine.iters >= Config.engine.n_iters: # don't run any more iterations
+            Config.engine.continue_cycle = False
+
+bmsb_stop = Bmsb_stop()
+
 
 # write_grid("output.tif")
 # This already exists so it was modified

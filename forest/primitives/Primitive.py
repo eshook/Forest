@@ -46,6 +46,18 @@ class Primitive(object):
         Config.engine.split()
         return right
 
+    def __ge__(self, right):
+        print(self, ">= (Cycle Stop)", right)
+        Config.engine.run(self)
+        Config.engine.cycle_termination()
+        return right
+
+    def __le__(self, right):
+        print(self, "<= (Cycle Start", right)
+        Config.engine.run(self)
+        Config.engine.cycle_start()
+        return right
+
     # This wrap function makes the primitive callable with 2 parameters
     def wrap(self,l,r):
         Config.engine.stack.push(r)

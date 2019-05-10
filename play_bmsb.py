@@ -23,12 +23,12 @@ Config.engine = cuda_engine
 print("Running Engine",Config.engine)
 
 # Constants
-MATRIX_SIZE = 100 # Size of square grid
-BLOCK_DIMS = 8 # CUDA block dimensions
+MATRIX_SIZE = 8 # Size of square grid
+BLOCK_DIMS = 2 # CUDA block dimensions
 GRID_DIMS = (MATRIX_SIZE + BLOCK_DIMS - 1) // BLOCK_DIMS # CUDA grid dimensions
-P_LOCAL = 0.50 # probability of local diffusion
-P_NON_LOCAL = 0.50 # probability of non-local diffusion
-N_ITERS = 5 # number of iterations
+P_LOCAL = 0.25 # probability of local diffusion
+P_NON_LOCAL = 0.25 # probability of non-local diffusion
+N_ITERS = 3 # number of iterations
 CODE = """
     #include <curand_kernel.h>
     #include <math.h>
@@ -159,6 +159,14 @@ LOCAL = MOD.get_function('local_diffuse')
 NON_LOCAL = MOD.get_function('non_local_diffuse')
 
 # Now run one iteration of the Brown Marmorated Stink Bug (BMSB) Diffusion Simulation
-run_primitive(empty_grid.size(MATRIX_SIZE) == initialize_grid.size(MATRIX_SIZE) < local_diffusion.vars(LOCAL, MATRIX_SIZE, GRID_DIMS, BLOCK_DIMS) == non_local_diffusion.vars(NON_LOCAL, MATRIX_SIZE, GRID_DIMS, BLOCK_DIMS) > AGStore.file("output.tif"))
+run_primitive(
+    empty_grid.size(MATRIX_SIZE) == 
+    initialize_grid.size(MATRIX_SIZE) ==
+    bmsb_stop_condition.vars(N_ITERS) <= 
+    local_diffusion.vars(LOCAL, MATRIX_SIZE, GRID_DIMS, BLOCK_DIMS) == 
+    non_local_diffusion.vars(NON_LOCAL, MATRIX_SIZE, GRID_DIMS, BLOCK_DIMS) ==
+    bmsb_stop >= 
+    AGStore.file("output.tif")
+    )
 
 
