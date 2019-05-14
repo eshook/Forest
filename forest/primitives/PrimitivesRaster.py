@@ -147,24 +147,42 @@ class Empty_grid(Primitive):
 
 empty_grid = Empty_grid()
 
+class Game_of_life_grid(Primitive):
+    def __call__(self):
+        if not self.size:
+            self.size = 4
+
+        grid = Raster(h=self.size,w=self.size,nrows=self.size,ncols=self.size)
+        grid.data = np.random.randint(2, size = (self.size, self.size)).astype(np.float32)
+
+        Config.engine.stack.push(grid)
+
+    def size(self,size):
+        self.size = size
+        return self
+
+game_of_life_grid = Game_of_life_grid()
+
 # local_diffusion() 
 class Local_diffusion(Primitive):
     def __call__(self):
 
         # This decorator will wrap the pop2data function around diff
         # It will pop off data (GPU'ified arrays), apply diff, and push data back onto stack
-        # Randoms are numbers between [0,1) used in the diffusion kernel
         @pop2data2gpu
         def diff(gpu_grid_a,gpu_grid_b):
+            f = open("results.txt", "a+")
+            f.write("\n\nGrid before local diffusion: \n{}".format(gpu_grid_a.get()))
             self.action(gpu_grid_a, gpu_grid_b, Config.engine.generator.state, grid = (self.grid_dims, self.grid_dims, 1), block = (self.block_dims, self.block_dims, 1))
             gpu_grid_a, gpu_grid_b = gpu_grid_b, gpu_grid_a
+            f.write("\n\nGrid after local diffusion: \n{}".format(gpu_grid_a.get()))
+            f.close()
 
             return gpu_grid_a,gpu_grid_b
 
     # Save kernel function, matrix size, grid size, and block size
-    def vars(self,f,s,g,b):
+    def vars(self,f,g,b):
         self.action = f
-        self.size = s
         self.grid_dims = g
         self.block_dims = b
         return self # Must still return self so there is something to call
@@ -177,28 +195,55 @@ class Non_local_diffusion(Primitive):
 
         # This decorator will wrap the pop2data function around diff
         # It will pop off data (GPU'ified arrays), apply diff, and push data back onto stack
-        # Randoms are numbers between [0,1) used in the diffusion kernel
-        # X_coords, Y_coords are used to decide non-local diffusion location
         @pop2data2gpu
         def diff(gpu_grid_a,gpu_grid_b):
+            f = open("results.txt", "a+")
+            f.write("\n\nnGrid before non-local diffusion: \n{}".format(gpu_grid_a.get()))
             self.action(gpu_grid_a, gpu_grid_b, Config.engine.generator.state, grid = (self.grid_dims, self.grid_dims, 1), block = (self.block_dims, self.block_dims, 1))
-            gpu_grid_a, gpu_grid_b = gpu_grid_b, gpu_grid_a	
+            gpu_grid_a, gpu_grid_b = gpu_grid_b, gpu_grid_a
+            f.write("\n\nGrid after non-local diffusion: \n{}".format(gpu_grid_a.get()))
+            f.close()
 
             return gpu_grid_a,gpu_grid_b 
 
     # Save kernel function, matrix size, grid size, and block size
-    def vars(self,f,s,g,b):
+    def vars(self,f,g,b):
         self.action = f
-        self.size = s
         self.grid_dims = g
         self.block_dims = b
         return self # Must still return self so there is something to call
 
 non_local_diffusion = Non_local_diffusion()
 
+class Survival_of_the_fittest(Primitive):
+    def __call__(self):
+
+        # This decorator will wrap the pop2data function around diff
+        # It will pop off data (GPU'ified arrays), apply diff, and push data back onto stack
+        @pop2data2gpu
+        def diff(gpu_grid_a,gpu_grid_b):
+            f = open("results.txt", "a+")
+            f.write("\n\nGrid before survival function: \n{}".format(gpu_grid_a.get()))
+            self.action(gpu_grid_a, gpu_grid_b, Config.engine.generator.state, grid = (self.grid_dims, self.grid_dims, 1), block = (self.block_dims, self.block_dims, 1))
+            gpu_grid_a, gpu_grid_b = gpu_grid_b, gpu_grid_a
+            f.write("\n\nGrid after survival function: \n{}".format(gpu_grid_a.get()))
+            f.close()
+
+            return gpu_grid_a,gpu_grid_b
+
+    # Save kernel function, matrix size, grid size, and block size
+    def vars(self,f,g,b):
+        self.action = f
+        self.grid_dims = g
+        self.block_dims = b
+        return self # Must still return self so there is something to call
+
+survival_function = Survival_of_the_fittest()
+
 class Bmsb_stop_condition(Primitive):
     def __call__(self):
-        Config.engine.n_iters = self.n_iters # set number of iterations to run
+        # set number of iterations to run
+        Config.engine.n_iters = self.n_iters
 
     def vars(self, n):
         self.n_iters = n
@@ -208,11 +253,34 @@ bmsb_stop_condition = Bmsb_stop_condition()
 
 class Bmsb_stop(Primitive):
     def __call__(self):
-        Config.engine.iters += 1 # increment iteration counter
-        if Config.engine.iters >= Config.engine.n_iters: # don't run any more iterations
+        Config.engine.iters += 1
+        # check if we want to run more iterations
+        if Config.engine.iters >= Config.engine.n_iters:
             Config.engine.continue_cycle = False
 
 bmsb_stop = Bmsb_stop()
+
+class Game_of_life(Primitive):
+    def __call__(self):
+
+        @pop2data2gpu
+        def diff(gpu_grid_a, gpu_grid_b):
+            f = open("results.txt", "a+")
+            f.write("\n\nGrid before life step: \n{}".format(gpu_grid_a.get()))
+            self.action(gpu_grid_a, gpu_grid_b,  grid = (self.grid_dims, self.grid_dims, 1), block = (self.block_dims, self.block_dims, 1))
+            gpu_grid_a, gpu_grid_b = gpu_grid_b, gpu_grid_a
+            f.write("\n\nGrid after life step: \n{}".format(gpu_grid_a.get()))
+            f.close()
+
+            return gpu_grid_a,gpu_grid_b
+
+    def vars(self,f,g,b):
+        self.action = f
+        self.grid_dims = g
+        self.block_dims = b
+        return self
+
+game_of_life = Game_of_life()
 
 
 # write_grid("output.tif")

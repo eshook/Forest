@@ -647,19 +647,25 @@ class CUDAEngine(Engine):
 
     # Cycle Start (<=)
     def cycle_start(self):
+        # Move from CPU to GPU memory and indicate we will be looping
         self.split()
         self.continue_cycle = True
 
     # Cycle Stop (>=)
     def cycle_termination(self):
+        # Loop until desired number of iterations is reached
         while self.continue_cycle == True:
             copy_queue = Queue()
+            # Pop primitives and run each again
             while self.queue.notempty():
                 prim = self.queue.dequeue()
                 copy_queue.enqueue(prim)
                 self.run(prim)
             self.queue = copy_queue
+            # Check if we are done looping
             bmsb_stop
+
+        # Now that were done looping, call merge to move from GPU to CPU memory
         self.merge()
 
 
@@ -670,6 +676,7 @@ class CUDAEngine(Engine):
         # Get the name of the primitive operation being executed
         name = primitive.__class__.__name__
 
+        # Save a copy of each primitive so we can loop
         if self.continue_cycle == True and self.iters == 0:
             self.queue.enqueue(primitive)
 
@@ -680,7 +687,6 @@ class CUDAEngine(Engine):
         else:
             # otherwise just run the primitive
             primitive()
-
 
 cuda_engine = CUDAEngine()
 
