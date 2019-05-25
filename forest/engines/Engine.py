@@ -63,7 +63,7 @@ class Queue(object):
         return len(self.queue)
 
     def __repr__(self):
-        return "Queue"+str(len(self.queue))+")"
+        return "Queue("+str(len(self.queue))+")"
 
 
 class Engine(object):

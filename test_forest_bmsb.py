@@ -11,7 +11,7 @@ import unittest
 from unittests import *
 
 # Use this to test a single suite (e.g., test_Bob)
-unittest.TextTestRunner(verbosity=2).run(test_Bmsb_suite)
+run_return = unittest.TextTestRunner(verbosity=2).run(test_Bmsb_suite)
 
 # If unit tests are successful, then run a coverage test
 if run_return.wasSuccessful():

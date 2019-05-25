@@ -1,126 +1,177 @@
 
+from test_forest_bmsb_imports import *
 from forest import *
 import unittest
 import numpy as np
 
-class TestBmsb(unittest.Testcase):
+import pycuda.autoinit
+import pycuda.driver as drv
+import pycuda.gpuarray as gpuarray
+
+class TestBmsb(unittest.TestCase):
 
 	def setUp(self):
-		Config.engine = cuda_engine
+		self.engine = cuda_engine
+		self.engine.stack = Stack()
+		self.engine.queue = Queue()
+		self.engine.continue_cycle = False
+		self.engine.n_iters = 0
+		self.engine.iters = 0
 
 	def test_cuda_engine(self):
 
-		self.assertFalse(Config.engine.continue_cycle)
-		self.assertEqual(Config.engine.n_iters, 0)
-		self.assertEqual(Config.engine.iters, 0)
-
-	def test_stack(self):
-		
-		mylist = [1,2]
-		stack = Stack()
-		stack.push(1)
-		stack.push(2)
-		self.assertListEqual(stack, mylist)
-		self.assertTrue(stack.notempty())
-		self.assertEqual(stack.pop(), 2)
-		self.assertEqual(stack.pop(), 1)
-		self.assertFalse(stack.notempty())
-
-	def test_queue(self):
-		
-		mylist = [1,2]
-		queue = Queue()
-		queue.enqueue(2)
-		queue.enqueue(1)
-		self.assertListEqual(queue, mylist)
-		self.assertTrue(queue.notempty())
-		self.assertEqual(queue.dequeue(), 2)
-		self.assertEqual(queue.dequeue(), 1)
-		self.assertFalse(queue.notempty())
+		self.assertFalse(self.engine.continue_cycle)
+		self.assertEqual(self.engine.n_iters, 0)
+		self.assertEqual(self.engine.iters, 0)
 
 	def test_grid_initialization(self):
 
-		grid_a = initialize_grid.size(10)
+		prim = Initialize_grid()
+		run_primitive(prim.size(10))
+		grid_a = self.engine.stack.pop().data
 		grid_b = np.zeros((10,10)).astype(np.float32)
 		grid_b[5][5] = 1
-		self.assertListEqual(grid_a, grid_b)
+		self.assertTrue((grid_a == grid_b).all())
 
-		grid_c = empty_grid.size(10)
+		prim = Empty_grid()
+		run_primitive(prim.size(10))
+		grid_c = self.engine.stack.pop().data
 		grid_d = np.zeros((10,10)).astype(np.float32)
-		self.assertListEqual(grid_c, grid_d)
+		self.assertTrue((grid_c == grid_d).all())
 
-	def test_bsmb_stop_condition(self):
+	def test_split_single_grid(self):
+		
+		prim = Empty_grid()
+		run_primitive(prim.size(10))
+		self.engine.split()
+		grid_gpu = self.engine.stack.pop()
+		self.assertIsInstance(grid_gpu, gpuarray.GPUArray)
 
-		bsmb_stop_condition.vars(3)
-		self.assertEqual(Config.engine.n_iters, 3)
+	def test_split_multiple_grid(self):
+
+		num_grids = 2
+		for i in range(num_grids):
+			prim = Empty_grid()
+			run_primitive(prim.size(10))
+		self.engine.split()
+		for i in range(num_grids):
+			grid_gpu = self.engine.stack.pop()
+			self.assertIsInstance(grid_gpu, gpuarray.GPUArray)
+
+	def test_merge_single_grid(self):
+		
+		# make sure merge works for a single grid
+		grid = Raster(h=10,w=10,nrows=10,ncols=10)
+		grid.data = grid.data.astype(np.float32)
+		grid_gpu = gpuarray.to_gpu(grid.data)
+		self.engine.stack.push(grid_gpu)
+		self.engine.merge()
+		grid_cpu = self.engine.stack.pop()
+		self.assertIsInstance(grid_cpu, np.ndarray)
+
+	def test_merge_multiple_grids(self):
+
+		# make sure merge works for two or more grids
+		num_grids = 2
+		for i in range(num_grids):
+			grid = Raster(h=10,w=10,nrows=10,ncols=10)
+			grid.data = grid.data.astype(np.float32)
+			grid_gpu = gpuarray.to_gpu(grid.data)
+			self.engine.stack.push(grid_gpu)
+		self.engine.merge()
+		for i in range(num_grids):
+			grid_cpu = self.engine.stack.pop()
+			self.assertIsInstance(grid_cpu, np.ndarray)
+
+	def __test_cycle_start(self):
+		pass
+
+	def __test_cycle_termination(self):
+		pass
+
+	def test_bmsb_stop_condition(self):
+
+		prim = Bmsb_stop_condition()
+		run_primitive(prim.vars(3))
+		self.assertEqual(self.engine.n_iters, 3)
 
 	def test_bmsb_stop(self):
 
-		Config.engine.continue_cycle = True
+		self.engine.continue_cycle = True
 		for i in range(5):
-			bmsb_stop
-		self.assertEqual(Config.engine.iters, 5)
-		self.assertFalse(Config.engine.continue_cycle)
+			prim = Bmsb_stop()
+			run_primitive(prim)
+		self.assertEqual(self.engine.iters, 5)
+		self.assertFalse(self.engine.continue_cycle)
 
-	def test_local_diffusion_kernel(self):
+	def test_local_diffusion_always(self):
 
-		#assume P_LOCAL = 1.0 (diffusion always occurs)
-		grid_a = initialize_grid.size(10)
-		grid_b = empty_grid.size(10)
-		local_diffusion(play_bmsb.LOCAL, 5, 2)
-
-		grid_c = np.zeros((10,10)).astype(np.float32)
+		prim = Empty_grid()
+		run_primitive(prim.size(10))
+		prim = Initialize_grid()
+		run_primitive(prim.size(10))
+		self.engine.split()
+		prim = Local_diffusion()
+		run_primitive(prim.vars(LOCAL, 5, 2))
+		grid_a = self.engine.stack.pop().get()
+		
+		grid_b = np.zeros((10,10)).astype(np.float32)
 		for i in range(4,7):
 			for j in range(4,7):
-				grid_c[i][j] = 1
-		self.assertListEqual(grid_a, grid_c)
+				grid_b[i][j] = 1
 
-		#assume P_LOCAL = 0.0 (diffusion never occurs)
-		grid_a = initialize_grid.size(10)
-		grid_b = empty_grid.size(10)
-		non_local_diffusion(play_bmsb.NON_LOCAL, 5, 2)
+		self.assertTrue((grid_a == grid_b).all())
 
-		grid_c = np.zeros((10,10)).astype(np.float32)
-		grid_c[5][5] = 1
-		self.assertListEqual(grid_a, grid_c)
+	def test_local_diffusion_never(self):
 
-		#edge case
-		grid_a = empty_grid.size(10)
-		grid_a[0][0] = 1
-		grid_b = empty_grid.size(10)
-		local_diffusion(play_bmsb.LOCAL, 5, 2)
+		prim = Empty_grid()
+		run_primitive(prim.size(10))
+		prim = Initialize_grid()
+		run_primitive(prim.size(10))
+		self.engine.split()
+		prim = Local_diffusion()
+		run_primitive(prim.vars(LOCAL, 5, 2))
+		grid_a = self.engine.stack.pop().get()
 
-		grid_c = np.zeros((10,10))
-		grid_c[0][0] = 1
-		self.assertListEqual(grid_a, grid_c)
+		grid_b = np.zeros((10,10)).astype(np.float32)
+		grid_b[5][5] = 1
 
-	def test_non_local_diffusion_kernel(self):
+		print("Grid_a = {}\tGrid_b = {}".format(grid_a, grid_b))
+		self.assertTrue((grid_a == grid_b).all())
+
+	def test_local_diffusion_edge(self):
+
+		prim = Empty_grid()
+		run_primitive(prim.size(10))
+		prim = Empty_grid()
+		run_primitive(prim.size(10))
+		bob = self.engine.stack.pop()
+		bob.data[0][0] = 1
+		self.engine.stack.push(bob)
+		self.engine.split()
+		prim = Local_diffusion()
+		run_primitive(prim.vars(LOCAL, 5, 2))
+		grid_a = self.engine.stack.pop().get()
+
+		grid_b = np.zeros((10,10)).astype(np.float32)
+		grid_b[0][0] = 1
+		self.assertTrue((grid_a == grid_b).all())
+
+	def __test_non_local_diffusion_kernel(self):
 		pass
 
-	def test_survival_kernel(self):
+	def __test_survival_kernel(self):
 		pass
 
-	def test_random_number_generation(self):
-		pass
-
-	def test_split(self):
-		pass
-
-	def test_merge(self):
-		pass
-
-	def test_cycle_start(self):
-		pass
-
-	def test_cycle_termination(self):
+	def __test_random_number_generation(self):
 		pass
 
 	def test_pop2data2gpu(self):
 
 		grid_a = np.zeros((10,10))
 		grid_b = np.ones((10,10))
-		Config.engine.stack.push(arr1)
-		Config.engine.stack.push(arr2)
+		self.engine.stack.push(grid_a)
+		self.engine.stack.push(grid_b)
 
 		@pop2data2gpu
 		def func(a,b):
@@ -128,7 +179,7 @@ class TestBmsb(unittest.Testcase):
 			return a,b
 
 		grid_c = np.ones((10,10))
-		self.assertListEqual(Config.engine.stack.pop(), grid_c)
+		self.assertTrue((self.engine.stack.pop() == grid_c).all())
 
 
 # Create the TestBmsb suite        
