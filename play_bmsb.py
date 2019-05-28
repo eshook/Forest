@@ -175,6 +175,8 @@ CODE = """
 
             if (grid_a[thread_id] > 0) {{
 
+                grid_b[thread_id] = grid_a[thread_id];
+
                 num = get_random_number(global_state, thread_id);
 
                 if (num < prob) {{

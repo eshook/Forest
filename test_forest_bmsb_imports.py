@@ -20,9 +20,9 @@ from pycuda.compiler import SourceModule
 MATRIX_SIZE = 10 # Size of square grid
 BLOCK_DIMS = 2 # CUDA block dimensions
 GRID_DIMS = (MATRIX_SIZE + BLOCK_DIMS - 1) // BLOCK_DIMS # CUDA grid dimensions
-P_LOCAL = 1.0 # probability of local diffusion
+P_LOCAL = 0.0 # probability of local diffusion
 P_NON_LOCAL = 0.25 # probability of non-local diffusion
-P_DEATH = 0.25 # probablity a cell dies after diffusion functions
+P_DEATH = 0.0 # probablity a cell dies after diffusion functions
 N_ITERS = 5 # number of iterations
 CODE = """
     #include <curand_kernel.h>
@@ -50,6 +50,23 @@ CODE = """
         //printf("Thread = %u\\tRandom x = %u\\tRandom y = %u\\n", thread_id, x, y);
         
         return y * grid_size + x;
+    }}
+
+    __global__ void test_get_random_number(curandState* global_state, float* grid) {{
+
+        unsigned int x = threadIdx.x + blockIdx.x * blockDim.x;
+        unsigned int y = threadIdx.y + blockIdx.y * blockDim.y;
+
+        if (x < 4 && y < 4) {{
+            unsigned int thread_id = y * 4 + x;
+            float num = get_random_number(global_state, thread_id);
+            grid[thread_id] = num;
+        }}
+
+    }}
+
+    __global__ void test_get_random_cell(curandState* global_state) {{
+    
     }}
 
     __global__ void local_diffuse(float* grid_a, float* grid_b, curandState* global_state)
@@ -169,6 +186,8 @@ CODE = """
 
             if (grid_a[thread_id] > 0) {{
 
+                grid_b[thread_id] = grid_a[thread_id];
+
                 num = get_random_number(global_state, thread_id);
 
                 if (num < prob) {{
@@ -188,4 +207,6 @@ MOD = SourceModule(KERNEL_CODE, no_extern_c = True)
 LOCAL = MOD.get_function('local_diffuse')
 NON_LOCAL = MOD.get_function('non_local_diffuse')
 SURVIVAL = MOD.get_function('survival_of_the_fittest')
+RAND_NUM = MOD.get_function('test_get_random_number')
+RAND_CELL = MOD.get_function('test_get_random_cell')
 
