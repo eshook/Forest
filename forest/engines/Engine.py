@@ -41,6 +41,9 @@ class Stack(object):
     def notempty(self):
         return len(self.stack)>0
 
+    def size(self):
+        return len(self.stack)
+
     def __repr__(self):
         return "Stack("+str(len(self.stack))+")"
 

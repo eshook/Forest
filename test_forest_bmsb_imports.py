@@ -21,7 +21,7 @@ MATRIX_SIZE = 10 # Size of square grid
 BLOCK_DIMS = 2 # CUDA block dimensions
 GRID_DIMS = (MATRIX_SIZE + BLOCK_DIMS - 1) // BLOCK_DIMS # CUDA grid dimensions
 P_LOCAL = 0.0 # probability of local diffusion
-P_NON_LOCAL = 0.25 # probability of non-local diffusion
+P_NON_LOCAL = 0.0 # probability of non-local diffusion
 P_DEATH = 0.0 # probablity a cell dies after diffusion functions
 N_ITERS = 5 # number of iterations
 CODE = """
@@ -65,7 +65,16 @@ CODE = """
 
     }}
 
-    __global__ void test_get_random_cell(curandState* global_state) {{
+    __global__ void test_get_random_cell(curandState* global_state, float* grid) {{
+
+        unsigned int x = threadIdx.x + blockIdx.x * blockDim.x;
+        unsigned int y = threadIdx.y + blockIdx.y * blockDim.y;
+
+        if (x < 4 && y < 4) {{
+            unsigned int thread_id = y * 4 + x;
+            float num = get_random_cell(global_state, thread_id, 4);
+            grid[thread_id] = num;
+        }}
     
     }}
 

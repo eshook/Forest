@@ -101,8 +101,23 @@ class TestBmsb(unittest.TestCase):
 		self.assertTrue(self.engine.is_split)
 		self.assertTrue(self.engine.continue_cycle)
 
+	# Cycle termination loops inifinitely for some reason right now
 	def __test_cycle_termination(self):
-		pass
+		
+		prim = Empty_grid()
+		run_primitive(prim.size(10))
+		prim = Initialize_grid()
+		run_primitive(prim.size(10))
+		prim = Bmsb_stop_condition()
+		run_primitive(prim.vars(5))
+		self.engine.cycle_start()
+		prim = Local_diffusion()
+		run_primitive(prim.vars(LOCAL, 5, 2))
+		self.engine.cycle_termination()
+
+		self.assertEqual(self.engine.iters, 5)
+		self.assertFalse(self.engine.is_split)
+		self.assertFalse(self.engine.continue_cycle)
 
 	def test_bmsb_stop_condition(self):
 
@@ -120,7 +135,7 @@ class TestBmsb(unittest.TestCase):
 		self.assertFalse(self.engine.continue_cycle)
 
 	# Need to figure out how to change P_LOCAL in play_bmsb before running test
-	def __test_local_diffusion_always(self):
+	def test_local_diffusion_always(self):
 
 		prim = Empty_grid()
 		run_primitive(prim.size(10))
@@ -139,7 +154,7 @@ class TestBmsb(unittest.TestCase):
 		self.assertTrue((grid_a == grid_b).all())
 
 	# Need to figure out how to change P_LOCAL in play_bmsb before running test
-	def __test_local_diffusion_never(self):
+	def test_local_diffusion_never(self):
 
 		prim = Empty_grid()
 		run_primitive(prim.size(10))
@@ -153,11 +168,10 @@ class TestBmsb(unittest.TestCase):
 		grid_b = np.zeros((10,10)).astype(np.float32)
 		grid_b[5][5] = 1
 
-		#print("Grid_a = {}\nGrid_b = {}".format(grid_a, grid_b))
 		self.assertTrue((grid_a == grid_b).all())
 
 	# Need to figure out how to change P_LOCAL in play_bmsb before running test
-	def __test_local_diffusion_edge(self):
+	def test_local_diffusion_edge(self):
 
 		prim = Empty_grid()
 		run_primitive(prim.size(10))
@@ -175,11 +189,34 @@ class TestBmsb(unittest.TestCase):
 		grid_b[0][0] = 1
 		self.assertTrue((grid_a == grid_b).all())
 
-	def __test_non_local_diffusion_kernel(self):
-		pass
+	def test_non_local_diffusion_never(self):
+		
+		prim = Empty_grid()
+		run_primitive(prim.size(10))
+		prim = Initialize_grid()
+		run_primitive(prim.size(10))
+		self.engine.split()
+		prim = Non_local_diffusion()
+		run_primitive(prim.vars(NON_LOCAL, 5, 2))
+		grid_a = self.engine.stack.pop().get()
+
+		grid_b = np.zeros((10,10)).astype(np.float32)
+		grid_b[5][5] = 1
+		self.assertTrue((grid_a == grid_b).all())
+
+	def __test_non_local_diffusion_once(self):
+
+		prim = Empty_grid()
+		run_primitive(prim.size(10))
+		prim = Empty_grid()
+		run_primitive(prim.size(10))
+		self.engine.split()
+		prim = Non_local_diffusion()
+		run_primitive(prim.vars(NON_LOCAL, 5, 2))
+		grid_a = self.engine.stack.pop().get()
 
 	# Need to figure out how to change P_DEATH in play_bmsb before running test
-	def __test_survival_kernel_none_survive(self):
+	def test_survival_kernel_none_survive(self):
 		
 		# make sure all cells die
 		prim = Empty_grid()
@@ -200,7 +237,7 @@ class TestBmsb(unittest.TestCase):
 		self.assertTrue((grid_a == grid_b).all())
 
 	# Need to figure out how to change P_DEATH in play_bmsb before running test
-	def __test_survival_kernel_all_survive(self):
+	def test_survival_kernel_all_survive(self):
 		
 		# make sure no cells die
 		prim = Empty_grid()
@@ -223,17 +260,33 @@ class TestBmsb(unittest.TestCase):
 				grid_b[i][j] = 1
 		self.assertTrue((grid_a == grid_b).all())
 
-	# Need to figure out how to set the same seed every time
-	# I'm not sure this is possible using this number generator
-	def __test_random_number_generation(self):
-		#seeds = np.ones((4,4)).astype(np.float32)
-		#seeds = gpuarray.to_gpu(seeds)
+	# Would be better to figure out how to set the same seed every time
+	def test_get_random_number(self):
+
 		grid = np.zeros((4,4)).astype(np.float32)
 		grid = gpuarray.to_gpu(grid)
 		self.engine.generator = curandom.XORWOWRandomNumberGenerator(curandom.seed_getter_uniform)
-		for i in range(3):
+		for i in range(10):
 			RAND_NUM(self.engine.generator.state, grid, grid = (2,2,1), block = (2,2,1))
-			print("Grid = ", grid.get())
+			grid_cpu = grid.get()
+			for i in range(grid_cpu.shape[0]):
+				for j in range(grid_cpu.shape[1]):
+					self.assertGreaterEqual(grid_cpu[i][j], 0)
+					self.assertLess(grid_cpu[i][j], 1)
+
+	# Would be better to figure out how to set the same seed every time
+	def test_get_random_cell(self):
+		
+		grid = np.zeros((4,4)).astype(np.float32)
+		grid = gpuarray.to_gpu(grid)
+		self.engine.generator = curandom.XORWOWRandomNumberGenerator(curandom.seed_getter_uniform)
+		for i in range(10):
+			RAND_CELL(self.engine.generator.state, grid, grid = (2,2,1), block = (2,2,1))
+			grid_cpu = grid.get()
+			for i in range(grid_cpu.shape[0]):
+				for j in range(grid_cpu.shape[1]):
+					self.assertGreaterEqual(grid_cpu[i][j], 0)
+					self.assertLess(grid_cpu[i][j], grid.shape[0] * grid.shape[0])
 
 	def test_pop2data2gpu(self):
 
