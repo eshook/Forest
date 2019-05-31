@@ -666,7 +666,7 @@ class CUDAEngine(Engine):
                 self.run(prim)
             self.queue = copy_queue
             # Check if we are done looping
-            bmsb_stop
+            #bmsb_stop
 
         # Now that were done looping, call merge to move from GPU to CPU memory
         self.merge()

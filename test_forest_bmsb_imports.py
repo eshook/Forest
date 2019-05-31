@@ -20,9 +20,12 @@ from pycuda.compiler import SourceModule
 MATRIX_SIZE = 10 # Size of square grid
 BLOCK_DIMS = 2 # CUDA block dimensions
 GRID_DIMS = (MATRIX_SIZE + BLOCK_DIMS - 1) // BLOCK_DIMS # CUDA grid dimensions
-P_LOCAL = 0.0 # probability of local diffusion
-P_NON_LOCAL = 0.0 # probability of non-local diffusion
-P_DEATH = 0.0 # probablity a cell dies after diffusion functions
+P_LOCAL_ALWAYS = 1.0 # probability of local diffusion
+P_LOCAL_NEVER = 0.0
+P_NON_LOCAL_ONCE = 1.0 # probability of non-local diffusion
+P_NON_LOCAL_NEVER = 0.0
+P_DEATH_NONE = 1.0 # probablity a cell dies after diffusion functions
+P_DEATH_ALL = 0.0
 N_ITERS = 5 # number of iterations
 CODE = """
     #include <curand_kernel.h>
@@ -78,7 +81,7 @@ CODE = """
     
     }}
 
-    __global__ void local_diffuse(float* grid_a, float* grid_b, curandState* global_state)
+    __global__ void local_diffuse_always(float* grid_a, float* grid_b, curandState* global_state)
     {{
 
         unsigned int grid_size = {};
@@ -146,7 +149,111 @@ CODE = """
         }}
     }}
 
-    __global__ void non_local_diffuse(float* grid_a, float* grid_b, curandState* global_state) {{
+    __global__ void local_diffuse_never(float* grid_a, float* grid_b, curandState* global_state)
+    {{
+
+        unsigned int grid_size = {};
+        float prob = {};
+
+        unsigned int x = threadIdx.x + blockIdx.x * blockDim.x;             // column element of index
+        unsigned int y = threadIdx.y + blockIdx.y * blockDim.y;             // row element of index
+
+        // make sure the the current thread is within bounds of grid
+        if (x < grid_size && y < grid_size) {{
+
+            unsigned int thread_id = y * grid_size + x;                     // thread index
+            float num;
+            unsigned int edge = (x == 0) || (x == grid_size - 1) || (y == 0) || (y == grid_size - 1);
+
+            // ignore cell if it is not already populated
+            if (grid_a[thread_id] > 0) {{
+
+                grid_b[thread_id] = grid_a[thread_id];                      // current cell
+
+                // edges are ignored as starting points
+                if (!edge) {{
+
+                    num = get_random_number(global_state, thread_id);
+                    if (num < prob) {{
+                        grid_b[thread_id - grid_size] += 1;                 // above
+                    }}
+
+                    num = get_random_number(global_state, thread_id);
+                    if (num < prob) {{
+                        grid_b[thread_id - grid_size - 1] += 1;             // above and left
+                    }}
+
+                    num = get_random_number(global_state, thread_id);
+                    if (num < prob) {{
+                        grid_b[thread_id - grid_size + 1] += 1;             // above and right
+                    }}
+
+                    num = get_random_number(global_state, thread_id);
+                    if (num < prob) {{
+                        grid_b[thread_id + grid_size] += 1;                 // below
+                    }}
+
+                    num = get_random_number(global_state, thread_id);
+                    if (num < prob) {{
+                        grid_b[thread_id + grid_size - 1] += 1;             // below and left
+                    }}
+
+                    num = get_random_number(global_state, thread_id);
+                    if (num < prob) {{
+                        grid_b[thread_id + grid_size + 1] += 1;             // below and right
+                    }}
+
+                    num = get_random_number(global_state, thread_id);
+                    if (num < prob) {{
+                        grid_b[thread_id - 1] += 1;                         // left
+                    }}
+
+                    num = get_random_number(global_state, thread_id);
+                    if (num < prob) {{
+                        grid_b[thread_id + 1] += 1;                         // right
+                    }}
+                }}
+            }}
+        }}
+    }}
+
+    __global__ void non_local_diffuse_once(float* grid_a, float* grid_b, curandState* global_state) {{
+
+        unsigned int grid_size = {};
+        float prob = {};
+
+        unsigned int x = threadIdx.x + blockIdx.x * blockDim.x;             // column index of element
+        unsigned int y = threadIdx.y + blockIdx.y * blockDim.y;             // row element of index
+
+        // make sure the the current thread is within bounds of grid
+        if (x < grid_size && y < grid_size) {{
+
+            unsigned int thread_id = y * grid_size + x;                     // thread index
+            float num;
+            unsigned int spread_index;
+
+            // ignore cell if it is not already populated
+            if (grid_a[thread_id] > 0) {{
+
+                grid_b[thread_id] = grid_a[thread_id];                      // current cell
+
+                //num = get_random_number(global_state, thread_id);
+                num = 0.0;
+
+                // non-local diffusion occurs until a num > prob is randomly generated
+                while (num < prob) {{
+
+                    //spread_index = get_random_cell(global_state, thread_id, grid_size);
+                    spread_index = (grid_size * grid_size) - 1;
+                    grid_b[spread_index] += 1;
+                    //num = get_random_number(global_state, thread_id);
+                    num = 2.0;
+                }}
+            }}
+        }}
+    }}
+
+    __global__ void non_local_diffuse_never(float* grid_a, float* grid_b, curandState* global_state) {{
 
         unsigned int grid_size = {};
         float prob = {};
@@ -179,7 +286,34 @@ CODE = """
         }}
     }}
 
-    __global__ void survival_of_the_fittest(float* grid_a, float* grid_b, curandState* global_state) {{
+    __global__ void survival_of_the_fittest_none_survive(float* grid_a, float* grid_b, curandState* global_state) {{
+
+        unsigned int grid_size = {};
+        float prob = {};
+
+        unsigned int x = threadIdx.x + blockIdx.x * blockDim.x;             // column index of element
+        unsigned int y = threadIdx.y + blockIdx.y * blockDim.y;             // row element of index
+
+        // make sure the current thread is within bounds of grid
+        if (x < grid_size && y < grid_size) {{
+
+            unsigned int thread_id = y * grid_size + x;
+            float num;
+
+            if (grid_a[thread_id] > 0) {{
+
+                grid_b[thread_id] = grid_a[thread_id];
+
+                num = get_random_number(global_state, thread_id);
+
+                if (num < prob) {{
+                    grid_b[thread_id] = 0;                                  // cell dies
+                }}
+            }}
+        }}
+    }}
+
+    __global__ void survival_of_the_fittest_all_survive(float* grid_a, float* grid_b, curandState* global_state) {{
 
         unsigned int grid_size = {};
         float prob = {};
@@ -209,13 +343,18 @@ CODE = """
 """
 
 # Format code with constants and compile kernel
-KERNEL_CODE = CODE.format(MATRIX_SIZE, P_LOCAL, MATRIX_SIZE, P_NON_LOCAL, MATRIX_SIZE, P_DEATH)
+KERNEL_CODE = CODE.format(MATRIX_SIZE, P_LOCAL_ALWAYS, MATRIX_SIZE, P_LOCAL_NEVER, 
+    MATRIX_SIZE, P_NON_LOCAL_ONCE, MATRIX_SIZE, P_NON_LOCAL_NEVER,
+    MATRIX_SIZE, P_DEATH_NONE, MATRIX_SIZE, P_DEATH_ALL)
 MOD = SourceModule(KERNEL_CODE, no_extern_c = True)
 
 # Get kernel functions
-LOCAL = MOD.get_function('local_diffuse')
-NON_LOCAL = MOD.get_function('non_local_diffuse')
-SURVIVAL = MOD.get_function('survival_of_the_fittest')
+LOCAL_ALWAYS = MOD.get_function('local_diffuse_always')
+LOCAL_NEVER = MOD.get_function('local_diffuse_never')
+NON_LOCAL_ONCE = MOD.get_function('non_local_diffuse_once')
+NON_LOCAL_NEVER = MOD.get_function('non_local_diffuse_never')
+SURVIVAL_NONE = MOD.get_function('survival_of_the_fittest_none_survive')
+SURVIVAL_ALL = MOD.get_function('survival_of_the_fittest_all_survive')
 RAND_NUM = MOD.get_function('test_get_random_number')
 RAND_CELL = MOD.get_function('test_get_random_cell')
 
