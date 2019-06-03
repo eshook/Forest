@@ -11,7 +11,6 @@ cov = coverage.coverage(omit = "/usr/*")
 cov.start()
 
 from forest import *
-import play_bmsb
 import unittest
 
 # Import Forest unit tests

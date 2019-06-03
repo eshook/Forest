@@ -9,7 +9,6 @@ Use of this source code is governed by a BSD-style license that can be found in 
 from ..bobs.Bob import *
 from ..bobs.Bobs import *
 from . import Config
-from ..primitives.PrimitivesRaster import bmsb_stop
 import copy
 import math
 import multiprocessing
@@ -665,8 +664,6 @@ class CUDAEngine(Engine):
                 copy_queue.enqueue(prim)
                 self.run(prim)
             self.queue = copy_queue
-            # Check if we are done looping
-            #bmsb_stop
 
         # Now that were done looping, call merge to move from GPU to CPU memory
         self.merge()
@@ -692,21 +689,6 @@ class CUDAEngine(Engine):
             primitive()
 
 cuda_engine = CUDAEngine()
-
-
-
-
-
-
-
-# Set the Config.engine as the default
-
-Config.engine = mp_engine
-Config.engine = tile_engine
-Config.engine = pass_engine
-Config.engine = cuda_engine
-
-print("Default engine",Config.engine)
 
 if __name__ == '__main__':
     pass

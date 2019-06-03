@@ -45,7 +45,7 @@ CODE = """
 
     }}
 
-    __device__ float get_random_cell(curandState* global_state, unsigned int thread_id, unsigned int grid_size) {{
+    __device__ unsigned int get_random_cell(curandState* global_state, unsigned int thread_id, unsigned int grid_size) {{
         
         unsigned int x = (int) truncf(get_random_number(global_state, thread_id) * (grid_size - 0.000001));
         unsigned int y = (int) truncf(get_random_number(global_state, thread_id) * (grid_size - 0.000001));

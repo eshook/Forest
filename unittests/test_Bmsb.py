@@ -12,139 +12,135 @@ import pycuda.curandom as curandom
 class TestBmsb(unittest.TestCase):
 
 	def setUp(self):
-		self.engine = cuda_engine
-		self.engine.stack = Stack()
-		self.engine.queue = Queue()
-		self.engine.is_split = False
-		self.engine.continue_cycle = False
-		self.engine.n_iters = 0
-		self.engine.iters = 0
+		Config.engine = CUDAEngine()
+
+	def test_stack(self):
+		stack = [1,2]
+		Config.engine.stack.push(1)
+		Config.engine.stack.push(2)
+		self.assertTrue(Config.engine.stack.notempty())
+		self.assertTrue(Config.engine.stack.size() == len(stack))
+		self.assertTrue(Config.engine.stack.pop() == stack.pop())
+		self.assertTrue(Config.engine.stack.pop() == stack.pop())
+		self.assertFalse(Config.engine.stack.notempty())
+
+	def test_queue(self):
+		queue = [1,2]
+		Config.engine.queue.enqueue(2)
+		Config.engine.queue.enqueue(1)
+		self.assertTrue(Config.engine.queue.notempty())
+		self.assertTrue(Config.engine.queue.size() == len(queue))
+		self.assertTrue(Config.engine.queue.dequeue() == queue.pop())
+		self.assertTrue(Config.engine.queue.dequeue() == queue.pop())
+		self.assertFalse(Config.engine.queue.notempty())
 
 	def test_cuda_engine(self):
 
-		self.assertFalse(self.engine.is_split)
-		self.assertFalse(self.engine.continue_cycle)
-		self.assertEqual(self.engine.n_iters, 0)
-		self.assertEqual(self.engine.iters, 0)
+		self.assertFalse(Config.engine.is_split)
+		self.assertFalse(Config.engine.continue_cycle)
+		self.assertEqual(Config.engine.n_iters, 0)
+		self.assertEqual(Config.engine.iters, 0)
+		self.assertIsInstance(Config.engine.generator, curandom.XORWOWRandomNumberGenerator)
+		#self.assertIsInstance(Config.engine.stack, ..forest.engines.Engine.Stack)
+		#self.assertIsInstance(Config.engine.bob_stack, ..forest.engines.Engine.Stack)
+		#self.assertIsInstance(Config.engine.queue, ..forest.engines.Engine.Queue)
 
-	def test_grid_initialization(self):
+	def test_initialize_grid(self):
 
-		prim = Initialize_grid()
-		run_primitive(prim.size(MATRIX_SIZE))
-		grid_a = self.engine.stack.pop().data
+		run_primitive(Initialize_grid().size(MATRIX_SIZE))
+		grid_a = Config.engine.stack.pop().data
 		grid_b = np.zeros((MATRIX_SIZE,MATRIX_SIZE)).astype(np.float32)
 		grid_b[MATRIX_SIZE//2][MATRIX_SIZE//2] = 1
 		self.assertTrue((grid_a == grid_b).all())
 
-		prim = Empty_grid()
-		run_primitive(prim.size(MATRIX_SIZE))
-		grid_c = self.engine.stack.pop().data
-		grid_d = np.zeros((MATRIX_SIZE,MATRIX_SIZE)).astype(np.float32)
-		self.assertTrue((grid_c == grid_d).all())
+	def test_empty_grid(self):
+
+		run_primitive(Empty_grid().size(MATRIX_SIZE))
+		grid_a = Config.engine.stack.pop().data
+		grid_b = np.zeros((MATRIX_SIZE,MATRIX_SIZE)).astype(np.float32)
+		self.assertTrue((grid_a == grid_b).all())
 
 	def test_split_single_grid(self):
 		
-		prim = Empty_grid()
-		run_primitive(prim.size(MATRIX_SIZE))
-		self.engine.split()
-		grid_gpu = self.engine.stack.pop()
-		self.assertTrue(self.engine.is_split)
+		run_primitive(Empty_grid().size(MATRIX_SIZE))
+		Config.engine.split()
+		grid_gpu = Config.engine.stack.pop()
+		self.assertTrue(Config.engine.is_split)
 		self.assertIsInstance(grid_gpu, gpuarray.GPUArray)
 
-	def test_split_multiple_grid(self):
+	def test_split_multiple_grids(self):
 
-		num_grids = 2
-		for i in range(num_grids):
-			prim = Empty_grid()
-			run_primitive(prim.size(MATRIX_SIZE))
-		self.engine.split()
-		self.assertTrue(self.engine.is_split)
-		for i in range(num_grids):
-			grid_gpu = self.engine.stack.pop()
+		run_primitive(Empty_grid().size(MATRIX_SIZE) == Empty_grid().size(MATRIX_SIZE))
+		Config.engine.split()
+		self.assertTrue(Config.engine.is_split)
+		while Config.engine.stack.notempty():
+			grid_gpu = Config.engine.stack.pop()
 			self.assertIsInstance(grid_gpu, gpuarray.GPUArray)
 
 	def test_merge_single_grid(self):
 		
-		# make sure merge works for a single grid
 		grid = Raster(h=MATRIX_SIZE,w=MATRIX_SIZE,nrows=MATRIX_SIZE,ncols=MATRIX_SIZE)
 		grid.data = grid.data.astype(np.float32)
 		grid_gpu = gpuarray.to_gpu(grid.data)
-		self.engine.stack.push(grid_gpu)
-		self.engine.merge()
-		grid_cpu = self.engine.stack.pop()
-		self.assertFalse(self.engine.is_split)
+		Config.engine.stack.push(grid_gpu)
+		Config.engine.merge()
+		grid_cpu = Config.engine.stack.pop()
+		self.assertFalse(Config.engine.is_split)
 		self.assertIsInstance(grid_cpu, np.ndarray)
 
 	def test_merge_multiple_grids(self):
 
-		# make sure merge works for two or more grids
 		num_grids = 2
 		for i in range(num_grids):
 			grid = Raster(h=MATRIX_SIZE,w=MATRIX_SIZE,nrows=MATRIX_SIZE,ncols=MATRIX_SIZE)
 			grid.data = grid.data.astype(np.float32)
 			grid_gpu = gpuarray.to_gpu(grid.data)
-			self.engine.stack.push(grid_gpu)
-		self.engine.merge()
-		self.assertFalse(self.engine.is_split)
+			Config.engine.stack.push(grid_gpu)
+		Config.engine.merge()
+		self.assertFalse(Config.engine.is_split)
 		for i in range(num_grids):
-			grid_cpu = self.engine.stack.pop()
+			grid_cpu = Config.engine.stack.pop()
 			self.assertIsInstance(grid_cpu, np.ndarray)
 
 	def test_cycle_start(self):
-		
-		prim = Empty_grid()
-		run_primitive(prim.size(MATRIX_SIZE))
-		prim = Initialize_grid()
-		run_primitive(prim.size(MATRIX_SIZE))
-		self.engine.cycle_start()
 
-		self.assertTrue(self.engine.is_split)
-		self.assertTrue(self.engine.continue_cycle)
+		run_primitive(Empty_grid().size(MATRIX_SIZE) == Initialize_grid().size(MATRIX_SIZE))
+		Config.engine.cycle_start()
 
-	# Cycle termination loops inifinitely for some reason right now
+		self.assertTrue(Config.engine.is_split)
+		self.assertTrue(Config.engine.continue_cycle)
+
 	def test_cycle_termination(self):
-		
-		prim = Empty_grid()
-		run_primitive(prim.size(MATRIX_SIZE))
-		prim = Initialize_grid()
-		run_primitive(prim.size(MATRIX_SIZE))
-		self.engine.n_iters = N_ITERS
-		self.engine.cycle_start()
-		prim = Local_diffusion()
-		run_primitive(prim.vars(LOCAL_ALWAYS, GRID_DIMS, BLOCK_DIMS))
-		prim = Bmsb_stop()
-		run_primitive(prim)
-		self.engine.cycle_termination()
 
-		self.assertEqual(self.engine.iters, N_ITERS)
-		self.assertFalse(self.engine.is_split)
-		self.assertFalse(self.engine.continue_cycle)
+		run_primitive(Empty_grid().size(MATRIX_SIZE) == Initialize_grid().size(MATRIX_SIZE))
+		Config.engine.n_iters = N_ITERS
+		Config.engine.cycle_start()
+		run_primitive(Local_diffusion().vars(LOCAL_ALWAYS, GRID_DIMS, BLOCK_DIMS) == Bmsb_stop())
+		Config.engine.cycle_termination()
+
+		self.assertEqual(Config.engine.iters, N_ITERS)
+		self.assertFalse(Config.engine.is_split)
+		self.assertFalse(Config.engine.continue_cycle)
 
 	def test_bmsb_stop_condition(self):
 
-		prim = Bmsb_stop_condition()
-		run_primitive(prim.vars(N_ITERS))
-		self.assertEqual(self.engine.n_iters, N_ITERS)
+		run_primitive(Bmsb_stop_condition().vars(N_ITERS))
+		self.assertEqual(Config.engine.n_iters, N_ITERS)
 
 	def test_bmsb_stop(self):
 
-		self.engine.continue_cycle = True
+		Config.engine.continue_cycle = True
 		for i in range(N_ITERS):
-			prim = Bmsb_stop()
-			run_primitive(prim)
-		self.assertEqual(self.engine.iters, N_ITERS)
-		self.assertFalse(self.engine.continue_cycle)
+			run_primitive(Bmsb_stop())
+		self.assertEqual(Config.engine.iters, N_ITERS)
+		self.assertFalse(Config.engine.continue_cycle)
 
 	def test_local_diffusion_always(self):
 
-		prim = Empty_grid()
-		run_primitive(prim.size(MATRIX_SIZE))
-		prim = Initialize_grid()
-		run_primitive(prim.size(MATRIX_SIZE))
-		self.engine.split()
-		prim = Local_diffusion()
-		run_primitive(prim.vars(LOCAL_ALWAYS, GRID_DIMS, BLOCK_DIMS))
-		grid_a = self.engine.stack.pop().get()
+		run_primitive(Empty_grid().size(MATRIX_SIZE) == Initialize_grid().size(MATRIX_SIZE))
+		Config.engine.split()
+		run_primitive(Local_diffusion().vars(LOCAL_ALWAYS, GRID_DIMS, BLOCK_DIMS))
+		grid_a = Config.engine.stack.pop().get()
 		
 		grid_b = np.zeros((MATRIX_SIZE,MATRIX_SIZE)).astype(np.float32)
 		for i in range((MATRIX_SIZE//2)-1,(MATRIX_SIZE//2)+2):
@@ -155,14 +151,10 @@ class TestBmsb(unittest.TestCase):
 
 	def test_local_diffusion_never(self):
 
-		prim = Empty_grid()
-		run_primitive(prim.size(MATRIX_SIZE))
-		prim = Initialize_grid()
-		run_primitive(prim.size(MATRIX_SIZE))
-		self.engine.split()
-		prim = Local_diffusion()
-		run_primitive(prim.vars(LOCAL_NEVER, GRID_DIMS, BLOCK_DIMS))
-		grid_a = self.engine.stack.pop().get()
+		run_primitive(Empty_grid().size(MATRIX_SIZE) == Initialize_grid().size(MATRIX_SIZE))
+		Config.engine.split()
+		run_primitive(Local_diffusion().vars(LOCAL_NEVER, GRID_DIMS, BLOCK_DIMS))
+		grid_a = Config.engine.stack.pop().get()
 
 		grid_b = np.zeros((MATRIX_SIZE,MATRIX_SIZE)).astype(np.float32)
 		grid_b[MATRIX_SIZE//2][MATRIX_SIZE//2] = 1
@@ -171,17 +163,13 @@ class TestBmsb(unittest.TestCase):
 
 	def test_local_diffusion_edge(self):
 
-		prim = Empty_grid()
-		run_primitive(prim.size(MATRIX_SIZE))
-		prim = Empty_grid()
-		run_primitive(prim.size(MATRIX_SIZE))
-		bob = self.engine.stack.pop()
+		run_primitive(Empty_grid().size(MATRIX_SIZE) == Empty_grid().size(MATRIX_SIZE))
+		bob = Config.engine.stack.pop()
 		bob.data[0][0] = 1
-		self.engine.stack.push(bob)
-		self.engine.split()
-		prim = Local_diffusion()
-		run_primitive(prim.vars(LOCAL_ALWAYS, GRID_DIMS, BLOCK_DIMS))
-		grid_a = self.engine.stack.pop().get()
+		Config.engine.stack.push(bob)
+		Config.engine.split()
+		run_primitive(Local_diffusion().vars(LOCAL_ALWAYS, GRID_DIMS, BLOCK_DIMS))
+		grid_a = Config.engine.stack.pop().get()
 
 		grid_b = np.zeros((MATRIX_SIZE,MATRIX_SIZE)).astype(np.float32)
 		grid_b[0][0] = 1
@@ -189,14 +177,10 @@ class TestBmsb(unittest.TestCase):
 
 	def test_non_local_diffusion_once(self):
 
-		prim = Empty_grid()
-		run_primitive(prim.size(MATRIX_SIZE))
-		prim = Initialize_grid()
-		run_primitive(prim.size(MATRIX_SIZE))
-		self.engine.split()
-		prim = Non_local_diffusion()
-		run_primitive(prim.vars(NON_LOCAL_ONCE, GRID_DIMS, BLOCK_DIMS))
-		grid_a = self.engine.stack.pop().get()
+		run_primitive(Empty_grid().size(MATRIX_SIZE) == Initialize_grid().size(MATRIX_SIZE))
+		Config.engine.split()
+		run_primitive(Non_local_diffusion().vars(NON_LOCAL_ONCE, GRID_DIMS, BLOCK_DIMS))
+		grid_a = Config.engine.stack.pop().get()
 
 		grid_b = np.zeros((MATRIX_SIZE,MATRIX_SIZE)).astype(np.float32)
 		grid_b[MATRIX_SIZE//2][MATRIX_SIZE//2] = 1
@@ -207,14 +191,10 @@ class TestBmsb(unittest.TestCase):
 
 	def test_non_local_diffusion_never(self):
 		
-		prim = Empty_grid()
-		run_primitive(prim.size(MATRIX_SIZE))
-		prim = Initialize_grid()
-		run_primitive(prim.size(MATRIX_SIZE))
-		self.engine.split()
-		prim = Non_local_diffusion()
-		run_primitive(prim.vars(NON_LOCAL_NEVER, GRID_DIMS, BLOCK_DIMS))
-		grid_a = self.engine.stack.pop().get()
+		run_primitive(Empty_grid().size(MATRIX_SIZE) == Initialize_grid().size(MATRIX_SIZE))
+		Config.engine.split()
+		run_primitive(Non_local_diffusion().vars(NON_LOCAL_NEVER, GRID_DIMS, BLOCK_DIMS))
+		grid_a = Config.engine.stack.pop().get()
 
 		grid_b = np.zeros((MATRIX_SIZE,MATRIX_SIZE)).astype(np.float32)
 		grid_b[MATRIX_SIZE//2][MATRIX_SIZE//2] = 1
@@ -225,19 +205,15 @@ class TestBmsb(unittest.TestCase):
 	def test_survival_kernel_none_survive(self):
 		
 		# make sure all cells die
-		prim = Empty_grid()
-		run_primitive(prim.size(MATRIX_SIZE))
-		prim = Empty_grid()
-		run_primitive(prim.size(MATRIX_SIZE))
-		bob = self.engine.stack.pop()
+		run_primitive(Empty_grid().size(MATRIX_SIZE) == Empty_grid().size(MATRIX_SIZE))
+		bob = Config.engine.stack.pop()
 		for i in range((MATRIX_SIZE//2)-1,(MATRIX_SIZE//2)+2):
 			for j in range((MATRIX_SIZE//2)-1,(MATRIX_SIZE//2)+2):
 				bob.data[i][j] = 1
-		self.engine.stack.push(bob)
-		self.engine.split()
-		prim = Survival_of_the_fittest()
-		run_primitive(prim.vars(SURVIVAL_NONE, GRID_DIMS, BLOCK_DIMS))
-		grid_a = self.engine.stack.pop().get()
+		Config.engine.stack.push(bob)
+		Config.engine.split()
+		run_primitive(Survival_of_the_fittest().vars(SURVIVAL_NONE, GRID_DIMS, BLOCK_DIMS))
+		grid_a = Config.engine.stack.pop().get()
 
 		grid_b = np.zeros((MATRIX_SIZE,MATRIX_SIZE)).astype(np.float32)
 		self.assertTrue((grid_a == grid_b).all())
@@ -246,19 +222,15 @@ class TestBmsb(unittest.TestCase):
 	def test_survival_kernel_all_survive(self):
 		
 		# make sure no cells die
-		prim = Empty_grid()
-		run_primitive(prim.size(MATRIX_SIZE))
-		prim = Empty_grid()
-		run_primitive(prim.size(MATRIX_SIZE))
-		bob = self.engine.stack.pop()
+		run_primitive(Empty_grid().size(MATRIX_SIZE) == Empty_grid().size(MATRIX_SIZE))
+		bob = Config.engine.stack.pop()
 		for i in range((MATRIX_SIZE//2)-1,(MATRIX_SIZE//2)+2):
 			for j in range((MATRIX_SIZE//2)-1,(MATRIX_SIZE//2)+2):
 				bob.data[i][j] = 1
-		self.engine.stack.push(bob)
-		self.engine.split()
-		prim = Survival_of_the_fittest()
-		run_primitive(prim.vars(SURVIVAL_ALL, GRID_DIMS, BLOCK_DIMS))
-		grid_a = self.engine.stack.pop().get()
+		Config.engine.stack.push(bob)
+		Config.engine.split()
+		run_primitive(Survival_of_the_fittest().vars(SURVIVAL_ALL, GRID_DIMS, BLOCK_DIMS))
+		grid_a = Config.engine.stack.pop().get()
 
 		grid_b = np.zeros((MATRIX_SIZE,MATRIX_SIZE)).astype(np.float32)
 		for i in range((MATRIX_SIZE//2)-1,(MATRIX_SIZE//2)+2):
@@ -271,9 +243,9 @@ class TestBmsb(unittest.TestCase):
 
 		grid = np.zeros((MATRIX_SIZE,MATRIX_SIZE)).astype(np.float32)
 		grid = gpuarray.to_gpu(grid)
-		self.engine.generator = curandom.XORWOWRandomNumberGenerator(curandom.seed_getter_uniform)
+		Config.engine.generator = curandom.XORWOWRandomNumberGenerator(curandom.seed_getter_uniform)
 		for i in range(10):
-			RAND_NUM(self.engine.generator.state, grid, grid = (GRID_DIMS,GRID_DIMS,1), block = (BLOCK_DIMS,BLOCK_DIMS,1))
+			RAND_NUM(Config.engine.generator.state, grid, grid = (GRID_DIMS,GRID_DIMS,1), block = (BLOCK_DIMS,BLOCK_DIMS,1))
 			grid_cpu = grid.get()
 			for i in range(MATRIX_SIZE):
 				for j in range(MATRIX_SIZE):
@@ -285,9 +257,9 @@ class TestBmsb(unittest.TestCase):
 		
 		grid = np.zeros((MATRIX_SIZE,MATRIX_SIZE)).astype(np.float32)
 		grid = gpuarray.to_gpu(grid)
-		self.engine.generator = curandom.XORWOWRandomNumberGenerator(curandom.seed_getter_uniform)
+		Config.engine.generator = curandom.XORWOWRandomNumberGenerator(curandom.seed_getter_uniform)
 		for i in range(10):
-			RAND_CELL(self.engine.generator.state, grid, grid = (GRID_DIMS,GRID_DIMS,1), block = (BLOCK_DIMS,BLOCK_DIMS,1))
+			RAND_CELL(Config.engine.generator.state, grid, grid = (GRID_DIMS,GRID_DIMS,1), block = (BLOCK_DIMS,BLOCK_DIMS,1))
 			grid_cpu = grid.get()
 			for i in range(MATRIX_SIZE):
 				for j in range(MATRIX_SIZE):
@@ -298,8 +270,8 @@ class TestBmsb(unittest.TestCase):
 
 		grid_a = np.zeros((MATRIX_SIZE,MATRIX_SIZE))
 		grid_b = np.ones((MATRIX_SIZE,MATRIX_SIZE))
-		self.engine.stack.push(grid_a)
-		self.engine.stack.push(grid_b)
+		Config.engine.stack.push(grid_a)
+		Config.engine.stack.push(grid_b)
 
 		@pop2data2gpu
 		def func(a,b):
@@ -307,7 +279,7 @@ class TestBmsb(unittest.TestCase):
 			return a,b
 
 		grid_c = np.ones((MATRIX_SIZE,MATRIX_SIZE))
-		self.assertTrue((self.engine.stack.pop() == grid_c).all())
+		self.assertTrue((Config.engine.stack.pop() == grid_c).all())
 
 
 # Create the TestBmsb suite        

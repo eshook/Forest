@@ -17,14 +17,12 @@ from pycuda.tools import DeviceData
 from pycuda.compiler import SourceModule
 
 # Switch Engine to GPU
-print("Original Engine",Config.engine)
-Config.engine = pass_engine
 Config.engine = cuda_engine
 print("Running Engine",Config.engine)
 
 # Constants
-MATRIX_SIZE = 10 # Size of square grid
-BLOCK_DIMS = 2 # CUDA block dimensions
+MATRIX_SIZE = 15 # Size of square grid
+BLOCK_DIMS = 4 # CUDA block dimensions
 GRID_DIMS = (MATRIX_SIZE + BLOCK_DIMS - 1) // BLOCK_DIMS # CUDA grid dimensions
 P_LOCAL = 0.25 # probability of local diffusion
 P_NON_LOCAL = 0.25 # probability of non-local diffusion
@@ -48,7 +46,7 @@ CODE = """
 
     }}
 
-    __device__ float get_random_cell(curandState* global_state, unsigned int thread_id, unsigned int grid_size) {{
+    __device__ unsigned int get_random_cell(curandState* global_state, unsigned int thread_id, unsigned int grid_size) {{
         
         unsigned int x = (int) truncf(get_random_number(global_state, thread_id) * (grid_size - 0.000001));
         unsigned int y = (int) truncf(get_random_number(global_state, thread_id) * (grid_size - 0.000001));
@@ -146,14 +144,20 @@ CODE = """
 
                 grid_b[thread_id] = grid_a[thread_id];                      // current cell
 
-                num = get_random_number(global_state, thread_id);
+                if (thread_id == 100) {{
 
-                // non-local diffusion occurs until a num > prob is randomly generated
-                while (num < prob) {{
-
-                    spread_index = get_random_cell(global_state, thread_id, grid_size);
-                    grid_b[spread_index] += 1;
                     num = get_random_number(global_state, thread_id);
+
+                    // non-local diffusion occurs until a num > prob is randomly generated
+
+                    while (num < prob) {{
+                        spread_index = get_random_cell(global_state, thread_id, grid_size);
+                        grid_b[spread_index] += 1;
+
+                        printf("Thread = %u\\tNum = %f\\tIndex = %u\\tGrid_b[spread_index] = %f\\n\\n");
+
+                        num = get_random_number(global_state, thread_id);
+                }}
                 }}
             }}
         }}

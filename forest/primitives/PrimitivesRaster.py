@@ -240,7 +240,6 @@ bmsb_stop_condition = Bmsb_stop_condition()
 # bmsb_stop
 class Bmsb_stop(Primitive):
     def __call__(self):
-        print("Bmsb_stop called")
         Config.engine.iters += 1
         # check if we want to run more iterations
         if Config.engine.iters >= Config.engine.n_iters:
