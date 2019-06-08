@@ -21,13 +21,13 @@ Config.engine = cuda_engine
 print("Running Engine",Config.engine)
 
 # Constants
-MATRIX_SIZE = 150 # Size of square grid
-BLOCK_DIMS = 8 # CUDA block dimensions
+MATRIX_SIZE = 10 # Size of square grid
+BLOCK_DIMS = 2 # CUDA block dimensions
 GRID_DIMS = (MATRIX_SIZE + BLOCK_DIMS - 1) // BLOCK_DIMS # CUDA grid dimensions
 P_LOCAL = 0.25 # probability of local diffusion
 P_NON_LOCAL = 0.20 # probability of non-local diffusion
 P_DEATH = 0.25 # probablity a cell dies after diffusion functions
-GROWTH_RATE = 0.05 # expnential growth rate
+GROWTH_RATE = 0.25 # expnential growth rate
 N_ITERS = 5 # number of iterations
 CODE = """
     #include <curand_kernel.h>
@@ -188,8 +188,7 @@ CODE = """
         }}
     }}
 
-    /*
-    __global__ void population_growth(float* initial_population, float* grid_a, float* grid_b, int time) {{
+    __global__ void population_growth(float* initial_population, float* grid_a, float* grid_b, int* time) {{
 
         int grid_size = {};
         float growth_rate = {};
@@ -201,14 +200,16 @@ CODE = """
 
             int thread_id = y * grid_size + x;
 
-            //xt = x0(1 + r)^t
-            int x0 = initial_population[thread_id];
-            int xt = (int) truncf(x0 * pow((1 + growth_rate), time));
+            if (initial_population[thread_id] > 0.0) {{
 
-            grid_b = grid_a[thread_id] + xt;
+                //xt = x0(1 + r)^t
+                int x0 = initial_population[thread_id];
+                int xt = (int) truncf(x0 * pow((1 + growth_rate), time[0]));
+                grid_b[thread_id] = grid_a[thread_id] + xt;
+                //printf("Initial population of cell %d = %f\\tPopulation increased by %d\\tNew population = %f\\n", thread_id, initial_population[thread_id], xt, grid_b[thread_id]);
+            }}
         }}
     }}
-    */
     }}
 """
 
@@ -220,15 +221,17 @@ MOD = SourceModule(KERNEL_CODE, no_extern_c = True)
 LOCAL = MOD.get_function('local_diffuse')
 NON_LOCAL = MOD.get_function('non_local_diffuse')
 SURVIVAL = MOD.get_function('survival_of_the_fittest')
+POPULATION_GROWTH = MOD.get_function('population_growth')
 
 # Now run one iteration of the Brown Marmorated Stink Bug (BMSB) Diffusion Simulation
 run_primitive(
     empty_grid.size(MATRIX_SIZE) == 
     initialize_grid.size(MATRIX_SIZE) ==
     bmsb_stop_condition.vars(N_ITERS) <= 
-    local_diffusion.vars(LOCAL, GRID_DIMS, BLOCK_DIMS) == 
-    non_local_diffusion.vars(NON_LOCAL, GRID_DIMS, BLOCK_DIMS) ==
-    survival_function.vars(SURVIVAL, GRID_DIMS, BLOCK_DIMS) ==
+    #local_diffusion.vars(LOCAL, GRID_DIMS, BLOCK_DIMS) == 
+    #non_local_diffusion.vars(NON_LOCAL, GRID_DIMS, BLOCK_DIMS) ==
+    #survival_function.vars(SURVIVAL, GRID_DIMS, BLOCK_DIMS) ==
+    population_growth.vars(POPULATION_GROWTH, GRID_DIMS, BLOCK_DIMS) ==
     bmsb_stop >= 
     AGStore.file("output.tif")
     )

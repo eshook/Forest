@@ -112,11 +112,13 @@ class Initialize_grid(Primitive):
          # Create grid and convert data to np.float32 (necessary for GPU computation)
          grid = Raster(h=self.size,w=self.size,nrows=self.size,ncols=self.size)
          grid.data = grid.data.astype(np.float32)
-         Config.engine.initial_population = grid.data
+         Config.engine.initial_population = grid
 
          # Set seed
          middle_cell = int(self.size/2)
          grid.data[middle_cell][middle_cell] = 1
+         grid.data[2][2] = 1
+         grid.data[7][7] = 1
 
          #return grid 
          Config.engine.stack.push(grid)
@@ -158,7 +160,8 @@ class Local_diffusion(Primitive):
         def diff(gpu_grid_a,gpu_grid_b):
             #f = open("results.txt", "a+")
             #f.write("\n\nGrid before local diffusion: \n{}".format(gpu_grid_a.get()))
-            self.action(gpu_grid_a, gpu_grid_b, Config.engine.generator.state, grid = (self.grid_dims, self.grid_dims, 1), block = (self.block_dims, self.block_dims, 1))
+            self.action(gpu_grid_a, gpu_grid_b, Config.engine.generator.state,
+                grid = (self.grid_dims, self.grid_dims, 1), block = (self.block_dims, self.block_dims, 1))
             gpu_grid_a, gpu_grid_b = gpu_grid_b, gpu_grid_a
             #f.write("\n\nGrid after local diffusion: \n{}".format(gpu_grid_a.get()))
             #f.close()
@@ -184,7 +187,8 @@ class Non_local_diffusion(Primitive):
         def diff(gpu_grid_a,gpu_grid_b):
             #f = open("results.txt", "a+")
             #f.write("\n\nGrid before non-local diffusion: \n{}".format(gpu_grid_a.get()))
-            self.action(gpu_grid_a, gpu_grid_b, Config.engine.generator.state, grid = (self.grid_dims, self.grid_dims, 1), block = (self.block_dims, self.block_dims, 1))
+            self.action(gpu_grid_a, gpu_grid_b, Config.engine.generator.state,
+                grid = (self.grid_dims, self.grid_dims, 1), block = (self.block_dims, self.block_dims, 1))
             gpu_grid_a, gpu_grid_b = gpu_grid_b, gpu_grid_a
             #f.write("\n\nGrid after non-local diffusion: \n{}".format(gpu_grid_a.get()))
             #f.close()
@@ -210,7 +214,8 @@ class Survival_of_the_fittest(Primitive):
         def diff(gpu_grid_a,gpu_grid_b):
             #f = open("results.txt", "a+")
             #f.write("\n\nGrid before survival function: \n{}".format(gpu_grid_a.get()))
-            self.action(gpu_grid_a, gpu_grid_b, Config.engine.generator.state, grid = (self.grid_dims, self.grid_dims, 1), block = (self.block_dims, self.block_dims, 1))
+            self.action(gpu_grid_a, gpu_grid_b, Config.engine.generator.state,
+                grid = (self.grid_dims, self.grid_dims, 1), block = (self.block_dims, self.block_dims, 1))
             gpu_grid_a, gpu_grid_b = gpu_grid_b, gpu_grid_a
             #f.write("\n\nGrid after survival function: \n{}".format(gpu_grid_a.get()))
             #f.close()
@@ -226,18 +231,30 @@ class Survival_of_the_fittest(Primitive):
 
 survival_function = Survival_of_the_fittest()
 
-'''
 # population_growth
 class Population_growth(Primitive):
     def __call__(self):
-        pass
 
-    def vars(self,f,p,g,b):
+        time = np.array(Config.engine.iters + 1).astype(np.int32)
+        time = gpuarray.to_gpu(time)
+        
+        @pop2data2gpu
+        def diff(gpu_grid_a,gpu_grid_b):
+            print('Grid before population growth = ', Config.engine.initial_population.get())
+            self.action(Config.engine.initial_population, gpu_grid_a, gpu_grid_b, time,
+                grid = (self.grid_dims, self.grid_dims, 1), block = (self.block_dims, self.block_dims, 1))
+            gpu_grid_a, gpu_grid_b = gpu_grid_b, gpu_grid_a
+            print('Grid after population growth = ', Config.engine.initial_population.get())
+
+            return gpu_grid_a,gpu_grid_b
+
+    def vars(self,f,g,b):
         self.action = f
         self.grid_dims = g
         self.block_dims = b
         return self # Must still return self so there is something to call
-'''
+
+population_growth = Population_growth()
 
 # bmsb_stop_condition
 class Bmsb_stop_condition(Primitive):
@@ -292,7 +309,8 @@ class Game_of_life(Primitive):
         def diff(gpu_grid_a, gpu_grid_b):
             #f = open("results.txt", "a+")
             #f.write("\n\nGrid before life step: \n{}".format(gpu_grid_a.get()))
-            self.action(gpu_grid_a, gpu_grid_b,  grid = (self.grid_dims, self.grid_dims, 1), block = (self.block_dims, self.block_dims, 1))
+            self.action(gpu_grid_a, gpu_grid_b, 
+                grid = (self.grid_dims, self.grid_dims, 1), block = (self.block_dims, self.block_dims, 1))
             gpu_grid_a, gpu_grid_b = gpu_grid_b, gpu_grid_a
             #f.write("\n\nGrid after life step: \n{}".format(gpu_grid_a.get()))
             #f.close()
