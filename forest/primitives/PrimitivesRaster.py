@@ -112,6 +112,7 @@ class Initialize_grid(Primitive):
          # Create grid and convert data to np.float32 (necessary for GPU computation)
          grid = Raster(h=self.size,w=self.size,nrows=self.size,ncols=self.size)
          grid.data = grid.data.astype(np.float32)
+         Config.engine.initial_population = grid.data
 
          # Set seed
          middle_cell = int(self.size/2)
@@ -224,6 +225,19 @@ class Survival_of_the_fittest(Primitive):
         return self # Must still return self so there is something to call
 
 survival_function = Survival_of_the_fittest()
+
+'''
+# population_growth
+class Population_growth(Primitive):
+    def __call__(self):
+        pass
+
+    def vars(self,f,p,g,b):
+        self.action = f
+        self.grid_dims = g
+        self.block_dims = b
+        return self # Must still return self so there is something to call
+'''
 
 # bmsb_stop_condition
 class Bmsb_stop_condition(Primitive):

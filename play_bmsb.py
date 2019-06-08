@@ -21,12 +21,13 @@ Config.engine = cuda_engine
 print("Running Engine",Config.engine)
 
 # Constants
-MATRIX_SIZE = 15 # Size of square grid
-BLOCK_DIMS = 4 # CUDA block dimensions
+MATRIX_SIZE = 150 # Size of square grid
+BLOCK_DIMS = 8 # CUDA block dimensions
 GRID_DIMS = (MATRIX_SIZE + BLOCK_DIMS - 1) // BLOCK_DIMS # CUDA grid dimensions
 P_LOCAL = 0.25 # probability of local diffusion
-P_NON_LOCAL = 0.25 # probability of non-local diffusion
+P_NON_LOCAL = 0.20 # probability of non-local diffusion
 P_DEATH = 0.25 # probablity a cell dies after diffusion functions
+GROWTH_RATE = 0.05 # expnential growth rate
 N_ITERS = 5 # number of iterations
 CODE = """
     #include <curand_kernel.h>
@@ -34,90 +35,91 @@ CODE = """
 
     extern "C" {{
 
-    __device__ float get_random_number(curandState* global_state, unsigned int thread_id) {{
+    __device__ float get_random_number(curandState* global_state, int thread_id) {{
         
         curandState local_state = global_state[thread_id];
         float num = curand_uniform(&local_state);
         global_state[thread_id] = local_state;
 
-        //printf("Thread = %u\\tRandom number = %f\\n", thread_id, num);
+        //printf("Random number = %f\\n", num);
 
         return num;
 
     }}
 
-    __device__ unsigned int get_random_cell(curandState* global_state, unsigned int thread_id, unsigned int grid_size) {{
+    __device__ int get_random_cell(curandState* global_state, int thread_id, int grid_size) {{
         
-        unsigned int x = (int) truncf(get_random_number(global_state, thread_id) * (grid_size - 0.000001));
-        unsigned int y = (int) truncf(get_random_number(global_state, thread_id) * (grid_size - 0.000001));
+        int x = (int) truncf(get_random_number(global_state, thread_id) * (grid_size - 0.000001));
+        int y = (int) truncf(get_random_number(global_state, thread_id) * (grid_size - 0.000001));
+        int coord = y * grid_size + x;
+
+        //printf("Cell %d is spreading to cell (%d,%d) - %d\\n", thread_id, x, y, coord);
         
-        //printf("Thread = %u\\tRandom x = %u\\tRandom y = %u\\n", thread_id, x, y);
-        
-        return y * grid_size + x;
+        return coord;
     }}
 
     __global__ void local_diffuse(float* grid_a, float* grid_b, curandState* global_state)
     {{
 
-        unsigned int grid_size = {};
+        int grid_size = {};
         float prob = {};
 
-        unsigned int x = threadIdx.x + blockIdx.x * blockDim.x;             // column element of index
-        unsigned int y = threadIdx.y + blockIdx.y * blockDim.y;             // row element of index
+        int x = threadIdx.x + blockIdx.x * blockDim.x;             // column element of index
+        int y = threadIdx.y + blockIdx.y * blockDim.y;             // row element of index
 
         // make sure the the current thread is within bounds of grid
         if (x < grid_size && y < grid_size) {{
 
-            unsigned int thread_id = y * grid_size + x;                     // thread index
+            int thread_id = y * grid_size + x;                     // thread index
             float num;
-            unsigned int edge = (x == 0) || (x == grid_size - 1) || (y == 0) || (y == grid_size - 1);
+            int edge = (x == 0) || (x == grid_size - 1) || (y == 0) || (y == grid_size - 1);
+
+            grid_b[thread_id] = grid_a[thread_id];                      // current cell
 
             // ignore cell if it is not already populated
-            if (grid_a[thread_id] > 0) {{
-
-                grid_b[thread_id] = grid_a[thread_id];                      // current cell
+            if (grid_a[thread_id] > 0.0) {{
 
                 // edges are ignored as starting points
                 if (!edge) {{
 
                     num = get_random_number(global_state, thread_id);
                     if (num < prob) {{
-                        grid_b[thread_id - grid_size] += 1;                 // above
+                        grid_b[thread_id - grid_size] += 1.0;                 // above
                     }}
 
                     num = get_random_number(global_state, thread_id);
                     if (num < prob) {{
-                        grid_b[thread_id - grid_size - 1] += 1;             // above and left
+                        grid_b[thread_id - grid_size - 1] += 1.0;             // above and left
                     }}
 
                     num = get_random_number(global_state, thread_id);
                     if (num < prob) {{
-                        grid_b[thread_id - grid_size + 1] += 1;             // above and right
+                        grid_b[thread_id - grid_size + 1] += 1.0;             // above and right
                     }}
 
                     num = get_random_number(global_state, thread_id);
                     if (num < prob) {{
-                        grid_b[thread_id + grid_size] += 1;                 // below
+                        grid_b[thread_id + grid_size] += 1.0;                 // below
                     }}
 
                     num = get_random_number(global_state, thread_id);
                     if (num < prob) {{
-                        grid_b[thread_id + grid_size - 1] += 1;             // below and left
+                        grid_b[thread_id + grid_size - 1] += 1.0;             // below and left
                     }}
 
                     num = get_random_number(global_state, thread_id);
                     if (num < prob) {{
-                        grid_b[thread_id + grid_size + 1] += 1;             // below and right
+                        grid_b[thread_id + grid_size + 1] += 1.0;             // below and right
                     }}
 
                     num = get_random_number(global_state, thread_id);
                     if (num < prob) {{
-                        grid_b[thread_id - 1] += 1;                         // left
+                        grid_b[thread_id - 1] += 1.0;                         // left
                     }}
 
                     num = get_random_number(global_state, thread_id);
                     if (num < prob) {{
-                        grid_b[thread_id + 1] += 1;                         // right
+                        grid_b[thread_id + 1] += 1.0;                         // right
                     }}
                 }}
             }}
@@ -126,38 +128,34 @@ CODE = """
 
     __global__ void non_local_diffuse(float* grid_a, float* grid_b, curandState* global_state) {{
 
-        unsigned int grid_size = {};
+        int grid_size = {};
         float prob = {};
 
-        unsigned int x = threadIdx.x + blockIdx.x * blockDim.x;             // column index of element
-        unsigned int y = threadIdx.y + blockIdx.y * blockDim.y;             // row element of index
+        int x = threadIdx.x + blockIdx.x * blockDim.x;             // column index of element
+        int y = threadIdx.y + blockIdx.y * blockDim.y;             // row element of index
 
         // make sure the the current thread is within bounds of grid
         if (x < grid_size && y < grid_size) {{
 
-            unsigned int thread_id = y * grid_size + x;                     // thread index
+            int thread_id = y * grid_size + x;                     // thread index
             float num;
-            unsigned int spread_index;
+            int spread_index;
+
+            grid_b[thread_id] = grid_a[thread_id];                      // current cell
 
             // ignore cell if it is not already populated
-            if (grid_a[thread_id] > 0) {{
+            if (grid_a[thread_id] > 0.0) {{
 
-                grid_b[thread_id] = grid_a[thread_id];                      // current cell
+                num = get_random_number(global_state, thread_id);
 
-                if (thread_id == 100) {{
+                // non-local diffusion occurs until a num > prob is randomly generated
+                //while (num < prob) {{
+                if (num < prob) {{
 
-                    num = get_random_number(global_state, thread_id);
-
-                    // non-local diffusion occurs until a num > prob is randomly generated
-
-                    while (num < prob) {{
-                        spread_index = get_random_cell(global_state, thread_id, grid_size);
-                        grid_b[spread_index] += 1;
-
-                        printf("Thread = %u\\tNum = %f\\tIndex = %u\\tGrid_b[spread_index] = %f\\n\\n");
-
-                        num = get_random_number(global_state, thread_id);
-                }}
+                    spread_index = get_random_cell(global_state, thread_id, grid_size);
+                    grid_b[spread_index] += 1.0;
+                    //printf("Cell %d is spreading to cell %d with population %d\\n", thread_id, spread_index, grid_b[spread_index]);
+                    //num = get_random_number(global_state, thread_id);
                 }}
             }}
         }}
@@ -165,35 +163,57 @@ CODE = """
 
     __global__ void survival_of_the_fittest(float* grid_a, float* grid_b, curandState* global_state) {{
 
-        unsigned int grid_size = {};
+        int grid_size = {};
         float prob = {};
 
-        unsigned int x = threadIdx.x + blockIdx.x * blockDim.x;             // column index of element
-        unsigned int y = threadIdx.y + blockIdx.y * blockDim.y;             // row element of index
+        int x = threadIdx.x + blockIdx.x * blockDim.x;             // column index of element
+        int y = threadIdx.y + blockIdx.y * blockDim.y;             // row element of index
 
         // make sure the current thread is within bounds of grid
         if (x < grid_size && y < grid_size) {{
 
-            unsigned int thread_id = y * grid_size + x;
+            int thread_id = y * grid_size + x;
             float num;
 
-            if (grid_a[thread_id] > 0) {{
+            grid_b[thread_id] = grid_a[thread_id];
 
-                grid_b[thread_id] = grid_a[thread_id];
+            if (grid_a[thread_id] > 0.0) {{
 
                 num = get_random_number(global_state, thread_id);
 
                 if (num < prob) {{
-                    grid_b[thread_id] = 0;                                  // cell dies
+                    grid_b[thread_id] = 0.0;                        // cell dies
                 }}
             }}
         }}
     }}
+
+    /*
+    __global__ void population_growth(float* initial_population, float* grid_a, float* grid_b, int time) {{
+
+        int grid_size = {};
+        float growth_rate = {};
+
+        int x = threadIdx.x + blockIdx.x * blockDim.x;
+        int y = threadIdx.y + blockIdx.y * blockDim.y;
+
+        if (x < grid_size && y < grid_size) {{
+
+            int thread_id = y * grid_size + x;
+
+            //xt = x0(1 + r)^t
+            int x0 = initial_population[thread_id];
+            int xt = (int) truncf(x0 * pow((1 + growth_rate), time));
+
+            grid_b = grid_a[thread_id] + xt;
+        }}
+    }}
+    */
     }}
 """
 
 # Format code with constants and compile kernel
-KERNEL_CODE = CODE.format(MATRIX_SIZE, P_LOCAL, MATRIX_SIZE, P_NON_LOCAL, MATRIX_SIZE, P_DEATH)
+KERNEL_CODE = CODE.format(MATRIX_SIZE, P_LOCAL, MATRIX_SIZE, P_NON_LOCAL, MATRIX_SIZE, P_DEATH, MATRIX_SIZE, GROWTH_RATE)
 MOD = SourceModule(KERNEL_CODE, no_extern_c = True)
 
 # Get kernel functions
@@ -212,5 +232,50 @@ run_primitive(
     bmsb_stop >= 
     AGStore.file("output.tif")
     )
+
+'''
+Possible kernel_types are: random distribution, cauchy distribution
+Kernel params for random distribution: none
+Kernel params for cauchy distribution: location, scale
+local_diffusion.vars(LOCAL, GRID_DIMS, BLOCK_DIMS, kernel_type, kernel_params) == 
+'''
+
+'''
+from PIL import Image
+im = Image.open('example.tif')
+imarray = numpy.array(im)
+print('Shape = ', imarray.shape)
+print('Size = ', imarray.size)
+'''
+
+'''
+import gdal
+example = gdal.Open('example.tif')
+example_array = np.array(example.getRasterBand(1).ReadAsArray())
+print('Shape = ', example_array.shape)
+print('Size = ', example_array.size)
+'''
+'''
+import rasterio
+with rasterio.open('example.tif', 'r') as ds:
+    arr = ds.read()
+print('Shape = ', arr.shape)
+print('Arr = ', arr)
+'''
+
+#population_grid = gdal.Open('eample.tif')
+#POPULATION_GRID_ARRAY = np.array(population_grid.getRasterBand(1).ReadAsArray())
+
+#survival_function.vars(SURVIVAL, GRID_DIMS, BLOCK_DIMS, SURVIVAL_LAYER_ARRAY)
+#initialize_grid.size(MATRIX_SIZE, POPULATION_GRID_ARRAY)
+
+'''
+select a direction at random with equal likelihood
+float angle = [random float between 0 and 1] * 2 * M_PI
+
+choose distance to diffuse one agent from cauchy distribution
+
+subtract one agent from source cell, add one agent to target cell
+'''
 
 
