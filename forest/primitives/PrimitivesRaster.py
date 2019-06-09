@@ -117,8 +117,8 @@ class Initialize_grid(Primitive):
          # Set seed
          middle_cell = int(self.size/2)
          grid.data[middle_cell][middle_cell] = 1
-         grid.data[2][2] = 1
-         grid.data[7][7] = 1
+         grid.data[1][1] = 1
+         grid.data[8][8] = 1
 
          #return grid 
          Config.engine.stack.push(grid)
@@ -237,7 +237,7 @@ class Population_growth(Primitive):
 
         time = np.array(Config.engine.iters + 1).astype(np.int32)
         time = gpuarray.to_gpu(time)
-        
+
         @pop2data2gpu
         def diff(gpu_grid_a,gpu_grid_b):
             print('Grid before population growth = ', Config.engine.initial_population.get())

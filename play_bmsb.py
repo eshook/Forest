@@ -25,7 +25,7 @@ MATRIX_SIZE = 10 # Size of square grid
 BLOCK_DIMS = 2 # CUDA block dimensions
 GRID_DIMS = (MATRIX_SIZE + BLOCK_DIMS - 1) // BLOCK_DIMS # CUDA grid dimensions
 P_LOCAL = 0.25 # probability of local diffusion
-P_NON_LOCAL = 0.20 # probability of non-local diffusion
+P_NON_LOCAL = 0.25 # probability of non-local diffusion
 P_DEATH = 0.25 # probablity a cell dies after diffusion functions
 GROWTH_RATE = 0.25 # expnential growth rate
 N_ITERS = 5 # number of iterations
@@ -47,15 +47,28 @@ CODE = """
 
     }}
 
-    __device__ int get_random_cell(curandState* global_state, int thread_id, int grid_size) {{
-        
-        int x = (int) truncf(get_random_number(global_state, thread_id) * (grid_size - 0.000001));
-        int y = (int) truncf(get_random_number(global_state, thread_id) * (grid_size - 0.000001));
-        int coord = y * grid_size + x;
+    __device__ float get_random_angle_in_radians(curandState* global_state, int thread_id) {{
 
-        //printf("Cell %d is spreading to cell (%d,%d) - %d\\n", thread_id, x, y, coord);
-        
-        return coord;
+        float radians = get_random_number(global_state, thread_id) * 2 * M_PI;
+        return radians;
+    }}
+
+    __device__ float get_random_cauchy_distance(curandState* global_state, int thread_id, int mu, int gamma) {{
+
+        float distance = fabsf(mu + gamma * tan(M_PI * (get_random_number(global_state,thread_id) - 0.5)));
+        return distance;
+    }}
+
+    __device__ int get_x_coord(int x, float radians, float distance) {{
+
+        int x_coord = (int) roundf(x + distance * sin(radians));
+        return x_coord;
+    }}
+
+    __device__ int get_y_coord(int y, float radians, float distance) {{
+
+        int y_coord = (int) roundf(y + distance * cos(radians));
+        return y_coord;
     }}
 
     __global__ void local_diffuse(float* grid_a, float* grid_b, curandState* global_state)
@@ -139,7 +152,13 @@ CODE = """
 
             int thread_id = y * grid_size + x;                     // thread index
             float num;
+            float radians;
+            float distance;
             int spread_index;
+            int mu = 0;             //****** Change later ******
+            int gamma = 1;          //****** Change later ******
+            int x_coord;
+            int y_coord;
 
             grid_b[thread_id] = grid_a[thread_id];                      // current cell
 
@@ -147,15 +166,21 @@ CODE = """
             if (grid_a[thread_id] > 0.0) {{
 
                 num = get_random_number(global_state, thread_id);
-
-                // non-local diffusion occurs until a num > prob is randomly generated
-                //while (num < prob) {{
+                
+                // non-local diffusion occurs if a num > prob is randomly generated
                 if (num < prob) {{
 
-                    spread_index = get_random_cell(global_state, thread_id, grid_size);
-                    grid_b[spread_index] += 1.0;
-                    //printf("Cell %d is spreading to cell %d with population %d\\n", thread_id, spread_index, grid_b[spread_index]);
-                    //num = get_random_number(global_state, thread_id);
+                    radians = get_random_angle_in_radians(global_state, thread_id);
+                    distance = get_random_cauchy_distance(global_state, thread_id, mu, gamma);
+                    x_coord = get_x_coord(x, radians, distance);
+                    y_coord = get_y_coord(y, radians, distance);
+                    printf("Radians = %f\\tDistance = %f\\tX = %d\\tY = %d\\tX_coord = %d\\tY_coord = %d\\n", radians, distance, x, y, x_coord, y_coord);
+
+                    if (x_coord < grid_size && x_coord >= 0 && y_coord < grid_size && y_coord >= 0 && (x_coord != x || y_coord != y)) {{
+                        spread_index = y_coord * grid_size + x_coord;
+                        grid_b[spread_index] += 1;
+                        printf("Cell (%d,%d) spread to cell (%d,%d)\\n", x, y, x_coord, y_coord);
+                    }}
                 }}
             }}
         }}
@@ -229,9 +254,9 @@ run_primitive(
     initialize_grid.size(MATRIX_SIZE) ==
     bmsb_stop_condition.vars(N_ITERS) <= 
     #local_diffusion.vars(LOCAL, GRID_DIMS, BLOCK_DIMS) == 
-    #non_local_diffusion.vars(NON_LOCAL, GRID_DIMS, BLOCK_DIMS) ==
+    non_local_diffusion.vars(NON_LOCAL, GRID_DIMS, BLOCK_DIMS) ==
     #survival_function.vars(SURVIVAL, GRID_DIMS, BLOCK_DIMS) ==
-    population_growth.vars(POPULATION_GROWTH, GRID_DIMS, BLOCK_DIMS) ==
+    #population_growth.vars(POPULATION_GROWTH, GRID_DIMS, BLOCK_DIMS) ==
     bmsb_stop >= 
     AGStore.file("output.tif")
     )
@@ -277,6 +302,7 @@ select a direction at random with equal likelihood
 float angle = [random float between 0 and 1] * 2 * M_PI
 
 choose distance to diffuse one agent from cauchy distribution
+dist = mu + gamma * tan(M_PI([random float between 0 and 1] - 0.5))
 
 subtract one agent from source cell, add one agent to target cell
 '''

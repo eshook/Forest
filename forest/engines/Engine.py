@@ -611,9 +611,7 @@ class CUDAEngine(Engine):
     def split(self):
 
         # Move initial population to GPU memory
-        print('Initial population grid_CPU = ', self.initial_population())
         self.initial_population = gpuarray.to_gpu(self.initial_population())
-        print('Initial population grid_GPU = ', self.initial_population.get())
 
         # Pop everything off the stack and move from CPU to GPU memory
         # Self.bob_stack contains bobs. Self.stack contains data
