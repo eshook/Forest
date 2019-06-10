@@ -240,11 +240,9 @@ class Population_growth(Primitive):
 
         @pop2data2gpu
         def diff(gpu_grid_a,gpu_grid_b):
-            print('Grid before population growth = ', Config.engine.initial_population.get())
             self.action(Config.engine.initial_population, gpu_grid_a, gpu_grid_b, time,
                 grid = (self.grid_dims, self.grid_dims, 1), block = (self.block_dims, self.block_dims, 1))
             gpu_grid_a, gpu_grid_b = gpu_grid_b, gpu_grid_a
-            print('Grid after population growth = ', Config.engine.initial_population.get())
 
             return gpu_grid_a,gpu_grid_b
 
