@@ -78,8 +78,6 @@ CODE = """
 
         int grid_size = {};
         float prob = {};
-        int mu = {};
-        int gamma = {};
 
         int x = threadIdx.x + blockIdx.x * blockDim.x;             // column element of index
         int y = threadIdx.y + blockIdx.y * blockDim.y;             // row element of index
@@ -300,7 +298,7 @@ CODE = """
 
 # Format code with constants and compile kernel
 KERNEL_CODE = CODE.format(
-    MATRIX_SIZE, P_LOCAL, MU, GAMMA,        # local diffusion kernel values
+    MATRIX_SIZE, P_LOCAL                   # local diffusion kernel values
     MATRIX_SIZE, P_NON_LOCAL, MU, GAMMA,    # non-local diffusion kernel
     MATRIX_SIZE, P_DEATH,                   # survival layer kernel
     MATRIX_SIZE, GROWTH_RATE)               # population layer kernel
