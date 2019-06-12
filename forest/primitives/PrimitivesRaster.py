@@ -117,8 +117,6 @@ class Initialize_grid(Primitive):
          # Set seed
          middle_cell = int(self.size/2)
          grid.data[middle_cell][middle_cell] = 1
-         grid.data[1][1] = 1
-         grid.data[8][8] = 1
 
          #return grid 
          Config.engine.stack.push(grid)
@@ -154,25 +152,25 @@ empty_grid = Empty_grid()
 class Local_diffusion(Primitive):
     def __call__(self):
 
-        # This decorator will wrap the pop2data function around diff
+        time = np.int32(Config.engine.iters + 1)
+
+        # This decorator will wrap the pop2data2gpu function around diff
         # It will pop off data (GPU'ified arrays), apply diff, and push data back onto stack
         @pop2data2gpu
         def diff(gpu_grid_a,gpu_grid_b):
-            #f = open("results.txt", "a+")
-            #f.write("\n\nGrid before local diffusion: \n{}".format(gpu_grid_a.get()))
-            self.action(gpu_grid_a, gpu_grid_b, Config.engine.generator.state,
-                grid = (self.grid_dims, self.grid_dims, 1), block = (self.block_dims, self.block_dims, 1))
+            self.action(gpu_grid_a, gpu_grid_b, Config.engine.generator.state, self.size, self.prob, time,
+                grid = (self.grid_dims, self.grid_dims), block = (self.block_dims, self.block_dims, 1))
             gpu_grid_a, gpu_grid_b = gpu_grid_b, gpu_grid_a
-            #f.write("\n\nGrid after local diffusion: \n{}".format(gpu_grid_a.get()))
-            #f.close()
 
             return gpu_grid_a,gpu_grid_b
 
     # Save kernel function, matrix size, grid size, and block size
-    def vars(self,f,g,b):
-        self.action = f
-        self.grid_dims = g
-        self.block_dims = b
+    def vars(self,func,size,prob,grid,block):
+        self.action = func
+        self.size = np.int32(size)
+        self.prob = np.float32(prob)
+        self.grid_dims = grid
+        self.block_dims = block
         return self # Must still return self so there is something to call
 
 local_diffusion = Local_diffusion()
@@ -181,25 +179,27 @@ local_diffusion = Local_diffusion()
 class Non_local_diffusion(Primitive):
     def __call__(self):
 
-        # This decorator will wrap the pop2data function around diff
+        time = np.int32(Config.engine.iters + 1)
+
+        # This decorator will wrap the pop2data2gpu function around diff
         # It will pop off data (GPU'ified arrays), apply diff, and push data back onto stack
         @pop2data2gpu
         def diff(gpu_grid_a,gpu_grid_b):
-            #f = open("results.txt", "a+")
-            #f.write("\n\nGrid before non-local diffusion: \n{}".format(gpu_grid_a.get()))
-            self.action(gpu_grid_a, gpu_grid_b, Config.engine.generator.state,
-                grid = (self.grid_dims, self.grid_dims, 1), block = (self.block_dims, self.block_dims, 1))
+            self.action(gpu_grid_a, gpu_grid_b, Config.engine.generator.state, self.size, self.prob, self.mu, self.gamma, time,
+                grid = (self.grid_dims, self.grid_dims), block = (self.block_dims, self.block_dims, 1))
             gpu_grid_a, gpu_grid_b = gpu_grid_b, gpu_grid_a
-            #f.write("\n\nGrid after non-local diffusion: \n{}".format(gpu_grid_a.get()))
-            #f.close()
 
             return gpu_grid_a,gpu_grid_b 
 
     # Save kernel function, matrix size, grid size, and block size
-    def vars(self,f,g,b):
-        self.action = f
-        self.grid_dims = g
-        self.block_dims = b
+    def vars(self,func,size,prob,mu,gamma,grid,block):
+        self.action = func
+        self.size = np.int32(size)
+        self.prob = np.float32(prob)
+        self.mu = np.float32(mu)
+        self.gamma = np.float32(gamma)
+        self.grid_dims = grid
+        self.block_dims = block
         return self # Must still return self so there is something to call
 
 non_local_diffusion = Non_local_diffusion()
@@ -208,25 +208,25 @@ non_local_diffusion = Non_local_diffusion()
 class Survival_of_the_fittest(Primitive):
     def __call__(self):
 
-        # This decorator will wrap the pop2data function around diff
+        time = np.int32(Config.engine.iters + 1)
+
+        # This decorator will wrap the pop2data2gpu function around diff
         # It will pop off data (GPU'ified arrays), apply diff, and push data back onto stack
         @pop2data2gpu
         def diff(gpu_grid_a,gpu_grid_b):
-            #f = open("results.txt", "a+")
-            #f.write("\n\nGrid before survival function: \n{}".format(gpu_grid_a.get()))
-            self.action(gpu_grid_a, gpu_grid_b, Config.engine.generator.state,
-                grid = (self.grid_dims, self.grid_dims, 1), block = (self.block_dims, self.block_dims, 1))
+            self.action(gpu_grid_a, gpu_grid_b, Config.engine.generator.state, self.size, self.prob, time,
+                grid = (self.grid_dims, self.grid_dims), block = (self.block_dims, self.block_dims, 1))
             gpu_grid_a, gpu_grid_b = gpu_grid_b, gpu_grid_a
-            #f.write("\n\nGrid after survival function: \n{}".format(gpu_grid_a.get()))
-            #f.close()
 
             return gpu_grid_a,gpu_grid_b
 
     # Save kernel function, matrix size, grid size, and block size
-    def vars(self,f,g,b):
-        self.action = f
-        self.grid_dims = g
-        self.block_dims = b
+    def vars(self,func,size,prob,grid,block):
+        self.action = func
+        self.size = np.int32(size)
+        self.prob = np.float32(prob)
+        self.grid_dims = grid
+        self.block_dims = block
         return self # Must still return self so there is something to call
 
 survival_function = Survival_of_the_fittest()
@@ -235,21 +235,24 @@ survival_function = Survival_of_the_fittest()
 class Population_growth(Primitive):
     def __call__(self):
 
-        time = np.array(Config.engine.iters + 1).astype(np.int32)
-        time = gpuarray.to_gpu(time)
+        time = np.int32(Config.engine.iters + 1)
 
+        # This decorator will wrap the pop2data2gpu function around diff
+        # It will pop off data (GPU'ified array), appliy diff, and push data back onto stack
         @pop2data2gpu
         def diff(gpu_grid_a,gpu_grid_b):
-            self.action(Config.engine.initial_population, gpu_grid_a, gpu_grid_b, time,
-                grid = (self.grid_dims, self.grid_dims, 1), block = (self.block_dims, self.block_dims, 1))
+            self.action(Config.engine.initial_population, gpu_grid_a, gpu_grid_b, self.size, self.rate, time,
+                grid = (self.grid_dims, self.grid_dims), block = (self.block_dims, self.block_dims, 1))
             gpu_grid_a, gpu_grid_b = gpu_grid_b, gpu_grid_a
 
             return gpu_grid_a,gpu_grid_b
 
-    def vars(self,f,g,b):
-        self.action = f
-        self.grid_dims = g
-        self.block_dims = b
+    def vars(self,func,size,rate,grid,block):
+        self.action = func
+        self.size = np.int32(size)
+        self.rate = np.float32(rate)
+        self.grid_dims = grid
+        self.block_dims = block
         return self # Must still return self so there is something to call
 
 population_growth = Population_growth()
@@ -308,7 +311,7 @@ class Game_of_life(Primitive):
             #f = open("results.txt", "a+")
             #f.write("\n\nGrid before life step: \n{}".format(gpu_grid_a.get()))
             self.action(gpu_grid_a, gpu_grid_b, 
-                grid = (self.grid_dims, self.grid_dims, 1), block = (self.block_dims, self.block_dims, 1))
+                grid = (self.grid_dims, self.grid_dims), block = (self.block_dims, self.block_dims, 1))
             gpu_grid_a, gpu_grid_b = gpu_grid_b, gpu_grid_a
             #f.write("\n\nGrid after life step: \n{}".format(gpu_grid_a.get()))
             #f.close()
@@ -316,10 +319,10 @@ class Game_of_life(Primitive):
             return gpu_grid_a,gpu_grid_b
 
     # Save kernel function, matrix size, grid size, and block size
-    def vars(self,f,g,b):
-        self.action = f
-        self.grid_dims = g
-        self.block_dims = b
+    def vars(self,func,grid,block):
+        self.action = func
+        self.grid_dims = grid
+        self.block_dims = block
         return self # Must still return self so there is something to call
 
 game_of_life = Game_of_life()
