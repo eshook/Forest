@@ -111,19 +111,18 @@ class Initialize_grid(Primitive):
 
          # Create grid and convert data to np.float32 (necessary for GPU computation)
          grid = Raster(h=self.size,w=self.size,nrows=self.size,ncols=self.size)
-         grid.data = grid.data.astype(np.float32)
+         grid.data = self.initial_population
          Config.engine.initial_population = grid
-
-         # Set seed
-         middle_cell = int(self.size/2)
-         grid.data[middle_cell][middle_cell] = 1
+         Config.engine.survival_probabilities = self.survival_probabilities
 
          #return grid 
          Config.engine.stack.push(grid)
 
     # Save the size of the grid parameter
-    def size(self,size):
+    def vars(self,size,init_pop,surv_probs):
          self.size = size
+         self.initial_population = init_pop
+         self.survival_probabilities = surv_probs
          return self # Must still return self so there is something to call
 
 initialize_grid = Initialize_grid()
@@ -142,7 +141,7 @@ class Empty_grid(Primitive):
          Config.engine.stack.push(grid)
 
     # Save the size of the grid parameter
-    def size(self,size):
+    def vars(self,size):
          self.size = size
          return self # Must still return self so there is something to call
 
@@ -214,17 +213,16 @@ class Survival_of_the_fittest(Primitive):
         # It will pop off data (GPU'ified arrays), apply diff, and push data back onto stack
         @pop2data2gpu
         def diff(gpu_grid_a,gpu_grid_b):
-            self.action(gpu_grid_a, gpu_grid_b, Config.engine.generator.state, self.size, self.prob, time,
+            self.action(gpu_grid_a, gpu_grid_b, Config.engine.generator.state, self.size, Config.engine.survival_probabilities, time,
                 grid = (self.grid_dims, self.grid_dims), block = (self.block_dims, self.block_dims, 1))
             gpu_grid_a, gpu_grid_b = gpu_grid_b, gpu_grid_a
 
             return gpu_grid_a,gpu_grid_b
 
     # Save kernel function, matrix size, grid size, and block size
-    def vars(self,func,size,prob,grid,block):
+    def vars(self,func,size,grid,block):
         self.action = func
         self.size = np.int32(size)
-        self.prob = np.float32(prob)
         self.grid_dims = grid
         self.block_dims = block
         return self # Must still return self so there is something to call

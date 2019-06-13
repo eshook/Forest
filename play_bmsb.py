@@ -21,16 +21,15 @@ Config.engine = cuda_engine
 print("Running Engine",Config.engine)
 
 # Constants
-MATRIX_SIZE = 10 # Size of square grid
-BLOCK_DIMS = 4 # CUDA block dimensions
-GRID_DIMS = (MATRIX_SIZE + BLOCK_DIMS - 1) // BLOCK_DIMS # CUDA grid dimensions
-P_LOCAL = 0.50 # probability an agent spreads during local diffusion
-P_NON_LOCAL = 0.50 # probability an agent spreads during non-local diffusion
-P_DEATH = 0.25 # probablity an agent dies during survival layer
-GROWTH_RATE = 0.50 # expnential growth rate of population layer
-MU = 0 # location parameter of cauchy distribution
-GAMMA = 1 # scale parameter of cauchy distribution
-N_ITERS = 5 # number of iterations
+MATRIX_SIZE = 10                                            # Size of square grid
+BLOCK_DIMS = 4                                              # CUDA block dimensions
+GRID_DIMS = (MATRIX_SIZE + BLOCK_DIMS - 1) // BLOCK_DIMS    # CUDA grid dimensions
+P_LOCAL = 0.50                                              # probability an agent spreads during local diffusion
+P_NON_LOCAL = 0.33                                          # probability an agent spreads during non-local diffusion
+GROWTH_RATE = 0.25                                          # expnential growth rate of population layer
+MU = 0.0                                                    # location parameter of cauchy distribution
+GAMMA = 1.0                                                 # scale parameter of cauchy distribution
+N_ITERS = 5                                                 # number of iterations
 KERNEL_CODE = """
     #include <curand_kernel.h>
     #include <math.h>
@@ -71,10 +70,14 @@ KERNEL_CODE = """
 
     __global__ void local_diffuse(float* grid_a, float* grid_b, curandState* global_state, int grid_size, float prob, int time) {
 
-        int x = threadIdx.x + blockIdx.x * blockDim.x;             // column element of index
-        int y = threadIdx.y + blockIdx.y * blockDim.y;             // row element of index
+        int x = threadIdx.x + blockIdx.x * blockDim.x;             // column element of cell
+        int y = threadIdx.y + blockIdx.y * blockDim.y;             // row element of cell
 
-        // make sure the the current thread is within bounds of grid
+        if (threadIdx.x >= 32 || threadIdx.y >= 32 || blockIdx.x >= 64 || blockIdx.y >= 64) {
+            printf("This shouldn't be printed!! There is a bug!!\\n");
+        }
+
+        // make sure this cell is within bounds of grid
         if (x < grid_size && y < grid_size) {
 
             //printf("X = %d\\tY = %d\\tThreadIdx.x = %d\\tBlockIdx.x = %d\\tBlockDim.x = %d\\tThreadIdx.y = %d\\tBlockIdx.y = %d\\tBlockDim.y = %d\\n", x, y, threadIdx.x, blockIdx.x, blockDim.x, threadIdx.y, blockIdx.y, blockDim.y);
@@ -94,12 +97,15 @@ KERNEL_CODE = """
                     float num;
                     int neighbor;
 
+                    // each agent has a chance to spread
                     while (count < n_iters) {
 
                         num = get_random_number(global_state, thread_id);
                         
+                        // this agent spreads to a neighbor
                         if (num < prob) {
 
+                            // randomly select a neighbor
                             neighbor = (int) ceilf(get_random_number(global_state, thread_id) * 8.0);
                             
                             grid_b[thread_id] -= 1.0;
@@ -137,7 +143,7 @@ KERNEL_CODE = """
                                     printf("Cell (%d,%d) spread to cell (%d,%d) at time %d\\n", x, y, x + 1, y, time);
                                     break;
                                 default:
-                                    printf("Invalid number encountered\\n");
+                                    //printf("Invalid number encountered\\n");
                                     break;
                             }
                         }
@@ -150,14 +156,14 @@ KERNEL_CODE = """
 
     __global__ void non_local_diffuse(float* grid_a, float* grid_b, curandState* global_state, int grid_size, float prob, float mu, float gamma, int time) {
 
-        int x = threadIdx.x + blockIdx.x * blockDim.x;             // column index of element
-        int y = threadIdx.y + blockIdx.y * blockDim.y;             // row element of index
-
-        // make sure the the current thread is within bounds of grid
+        int x = threadIdx.x + blockIdx.x * blockDim.x;             // column index of cell
+        int y = threadIdx.y + blockIdx.y * blockDim.y;             // row index of cell
+ 
+        // make sure this cell is within bounds of grid
         if (x < grid_size && y < grid_size) {
 
             int thread_id = y * grid_size + x;                     // thread index
-            grid_b[thread_id] = grid_a[thread_id];                 // current cell
+            grid_b[thread_id] = grid_a[thread_id];                 // copy current cell
 
             // ignore cell if it is not already populated
             if (grid_a[thread_id] > 0.0) {
@@ -171,19 +177,22 @@ KERNEL_CODE = """
                 int x_coord;
                 int y_coord;
 
+                // each agent has a chance to spread
                 while (count < n_iters) {
 
                     num = get_random_number(global_state, thread_id);
                     
-                    // non-local diffusion occurs if a num < prob is randomly generated
+                    // this agent spreads to a neighbor
                     if (num < prob) {
 
+                        // randomly select a cell
                         radians = get_random_angle_in_radians(global_state, thread_id);
                         distance = get_random_cauchy_distance(global_state, thread_id, mu, gamma);
                         x_coord = get_x_coord(x, radians, distance);
                         y_coord = get_y_coord(y, radians, distance);
                         //printf("Radians = %f\\tDistance = %f\\tX = %d\\tY = %d\\tX_coord = %d\\tY_coord = %d\\n", radians, distance, x, y, x_coord, y_coord);
 
+                        // make sure chosen cell is in the grid dimensions and is not the current cell
                         if (x_coord < grid_size && x_coord >= 0 && y_coord < grid_size && y_coord >= 0 && (x_coord != x || y_coord != y)) {
                             spread_index = y_coord * grid_size + x_coord;
                             grid_b[thread_id] -= 1;
@@ -197,25 +206,27 @@ KERNEL_CODE = """
         }
     }
 
-    __global__ void survival_of_the_fittest(float* grid_a, float* grid_b, curandState* global_state, int grid_size, float prob, int time) {
+    __global__ void survival_of_the_fittest(float* grid_a, float* grid_b, curandState* global_state, int grid_size, float* survival_probabilities, int time) {
 
-        int x = threadIdx.x + blockIdx.x * blockDim.x;             // column index of element
-        int y = threadIdx.y + blockIdx.y * blockDim.y;             // row element of index
+        int x = threadIdx.x + blockIdx.x * blockDim.x;             // column index of cell
+        int y = threadIdx.y + blockIdx.y * blockDim.y;             // row index of cell
 
-        // make sure the current thread is within bounds of grid
+        // make sure this cell is within bounds of grid
         if (x < grid_size && y < grid_size) {
 
-            int thread_id = y * grid_size + x;
-            grid_b[thread_id] = grid_a[thread_id];
+            int thread_id = y * grid_size + x;                      // thread index
+            grid_b[thread_id] = grid_a[thread_id];                  // copy current cell
             float num;
 
+            // ignore cell if it is not already populated
             if (grid_a[thread_id] > 0.0) {
 
                 num = get_random_number(global_state, thread_id);
 
-                if (num < prob) {
+                // agents in this cell die
+                if (num < survival_probabilities[thread_id]) {
                     grid_b[thread_id] = 0.0;                        // cell dies
-                    printf("Cell (%d,%d) died at time %d\\n", x, y, time);
+                    printf("Cell (%d,%d) died at time %d (probability of death was %f)\\n", x, y, time, survival_probabilities[thread_id]);
                 }
             }
         }
@@ -223,17 +234,19 @@ KERNEL_CODE = """
 
     __global__ void population_growth(float* initial_population, float* grid_a, float* grid_b, int grid_size, float growth_rate, int time) {
 
-        int x = threadIdx.x + blockIdx.x * blockDim.x;
-        int y = threadIdx.y + blockIdx.y * blockDim.y;
+        int x = threadIdx.x + blockIdx.x * blockDim.x;              // column index of cell
+        int y = threadIdx.y + blockIdx.y * blockDim.y;              // row index of cell
 
+        // make sure this cell is within bounds of grid
         if (x < grid_size && y < grid_size) {
 
-            int thread_id = y * grid_size + x;
-            grid_b[thread_id] = grid_a[thread_id];
+            int thread_id = y * grid_size + x;                      // thread index
+            grid_b[thread_id] = grid_a[thread_id];                  // copy current cell
 
+            // ignore cell if initial population was 0
             if (initial_population[thread_id] > 0.0) {
 
-                //xt = x0(1 + r)^t
+                // growth formula: xt = x0(1 + growth_rate)^time
                 int x0 = initial_population[thread_id];
                 int xt = (int) truncf(x0 * pow((1 + growth_rate), time));
                 grid_b[thread_id] += xt;
@@ -241,7 +254,8 @@ KERNEL_CODE = """
             }
         }
     }
-    }
+    
+    } // end extern "C"
 """
 
 MOD = SourceModule(KERNEL_CODE, no_extern_c = True)
@@ -252,32 +266,31 @@ NON_LOCAL = MOD.get_function('non_local_diffuse')
 SURVIVAL = MOD.get_function('survival_of_the_fittest')
 POPULATION_GROWTH = MOD.get_function('population_growth')
 
+# Load initial population and survival layer probabilities
+initial_population = np.loadtxt('/home/iaa/bures024/Forest/initial_population.tif').astype(np.float32)
+survival_probabilities = np.loadtxt('/home/iaa/bures024/Forest/survival_probabilities.tif').astype(np.float32)
+
 # Now run one iteration of the Brown Marmorated Stink Bug (BMSB) Diffusion Simulation
 run_primitive(
-    empty_grid.size(MATRIX_SIZE) == 
-    initialize_grid.size(MATRIX_SIZE) ==
+    empty_grid.vars(MATRIX_SIZE) == 
+    initialize_grid.vars(MATRIX_SIZE, initial_population, survival_probabilities) ==
     bmsb_stop_condition.vars(N_ITERS) <= 
     local_diffusion.vars(LOCAL, MATRIX_SIZE, P_LOCAL, GRID_DIMS, BLOCK_DIMS) == 
     non_local_diffusion.vars(NON_LOCAL, MATRIX_SIZE, P_NON_LOCAL, MU, GAMMA, GRID_DIMS, BLOCK_DIMS) ==
-    survival_function.vars(SURVIVAL, MATRIX_SIZE, P_DEATH, GRID_DIMS, BLOCK_DIMS) ==
+    survival_function.vars(SURVIVAL, MATRIX_SIZE, GRID_DIMS, BLOCK_DIMS) ==
     population_growth.vars(POPULATION_GROWTH, MATRIX_SIZE, GROWTH_RATE, GRID_DIMS, BLOCK_DIMS) ==
     bmsb_stop >= 
     AGStore.file("output.tif")
     )
 
-'''
-Possible kernel_types are: random distribution, cauchy distribution
-Kernel params for random distribution: none
-Kernel params for cauchy distribution: location, scale
-local_diffusion.vars(LOCAL, GRID_DIMS, BLOCK_DIMS, kernel_type, kernel_params) == 
-'''
+# other possibilites for opening a .tif file (depending on what the data inside looks like)
 
 '''
 from PIL import Image
-im = Image.open('example.tif')
-imarray = numpy.array(im)
-print('Shape = ', imarray.shape)
-print('Size = ', imarray.size)
+example = Image.open('example.tif')
+example_array = numpy.array(example)
+print('Shape = ', example_array.shape)
+print('Size = ', example_array.size)
 '''
 
 '''
@@ -290,15 +303,8 @@ print('Size = ', example_array.size)
 '''
 import rasterio
 with rasterio.open('example.tif', 'r') as ds:
-    arr = ds.read()
-print('Shape = ', arr.shape)
-print('Arr = ', arr)
+    example_array = ds.read()
+print('Shape = ', example_array.shape)
+print('Array = ', example_array)
 '''
-
-#population_grid = gdal.Open('eample.tif')
-#POPULATION_GRID_ARRAY = np.array(population_grid.getRasterBand(1).ReadAsArray())
-
-#survival_function.vars(SURVIVAL, GRID_DIMS, BLOCK_DIMS, SURVIVAL_LAYER_ARRAY)
-#initialize_grid.size(MATRIX_SIZE, POPULATION_GRID_ARRAY)
-
 
