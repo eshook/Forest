@@ -21,16 +21,16 @@ Config.engine = cuda_engine
 print("Running Engine",Config.engine)
 
 # Constants
-MATRIX_SIZE = 10                                            # Size of square grid
-BLOCK_DIMS = 4                                              # CUDA block dimensions
-GRID_DIMS = (MATRIX_SIZE + BLOCK_DIMS - 1) // BLOCK_DIMS    # CUDA grid dimensions
-P_LOCAL = 0.50                                              # probability an agent spreads during local diffusion
-P_NON_LOCAL = 0.33                                          # probability an agent spreads during non-local diffusion
-GROWTH_RATE = 0.25                                          # expnential growth rate of population layer
-MU = 0.0                                                    # location parameter of cauchy distribution
-GAMMA = 1.0                                                 # scale parameter of cauchy distribution
-N_ITERS = 5                                                 # number of iterations
-KERNEL_CODE = """
+matrix_size = 10                                            # Size of square grid
+block_dims = 4                                              # CUDA block dimensions
+grid_dims = (matrix_size + block_dims - 1) // block_dims    # CUDA grid dimensions
+p_local = 0.50                                              # probability an agent spreads during local diffusion
+p_non_local = 0.33                                          # probability an agent spreads during non-local diffusion
+growth_rate = 0.25                                          # expnential growth rate of population layer
+mu = 0.0                                                    # location parameter of cauchy distribution
+gamma = 1.0                                                 # scale parameter of cauchy distribution
+n_iters = 5                                                 # number of iterations
+kernel_code = """
     #include <curand_kernel.h>
     #include <math.h>
 
@@ -258,13 +258,13 @@ KERNEL_CODE = """
     } // end extern "C"
 """
 
-MOD = SourceModule(KERNEL_CODE, no_extern_c = True)
+mod = SourceModule(kernel_code, no_extern_c = True)
 
 # Get kernel functions
-LOCAL = MOD.get_function('local_diffuse')
-NON_LOCAL = MOD.get_function('non_local_diffuse')
-SURVIVAL = MOD.get_function('survival_of_the_fittest')
-POPULATION_GROWTH = MOD.get_function('population_growth')
+local = mod.get_function('local_diffuse')
+non_local = mod.get_function('non_local_diffuse')
+survival_layer = mod.get_function('survival_of_the_fittest')
+population_layer = mod.get_function('population_growth')
 
 # Load initial population and survival layer probabilities
 initial_population = np.loadtxt('/home/iaa/bures024/Forest/initial_population.tif').astype(np.float32)
@@ -272,13 +272,13 @@ survival_probabilities = np.loadtxt('/home/iaa/bures024/Forest/survival_probabil
 
 # Now run one iteration of the Brown Marmorated Stink Bug (BMSB) Diffusion Simulation
 run_primitive(
-    empty_grid.vars(MATRIX_SIZE) == 
-    initialize_grid.vars(MATRIX_SIZE, initial_population, survival_probabilities) ==
-    bmsb_stop_condition.vars(N_ITERS) <= 
-    local_diffusion.vars(LOCAL, MATRIX_SIZE, P_LOCAL, GRID_DIMS, BLOCK_DIMS) == 
-    non_local_diffusion.vars(NON_LOCAL, MATRIX_SIZE, P_NON_LOCAL, MU, GAMMA, GRID_DIMS, BLOCK_DIMS) ==
-    survival_function.vars(SURVIVAL, MATRIX_SIZE, GRID_DIMS, BLOCK_DIMS) ==
-    population_growth.vars(POPULATION_GROWTH, MATRIX_SIZE, GROWTH_RATE, GRID_DIMS, BLOCK_DIMS) ==
+    empty_grid.vars(matrix_size) == 
+    initialize_grid.vars(matrix_size, initial_population, survival_probabilities) ==
+    bmsb_stop_condition.vars(n_iters) <= 
+    local_diffusion.vars(local, matrix_size, p_local, grid_dims, block_dims) == 
+    non_local_diffusion.vars(non_local, matrix_size, p_non_local, mu, gamma, grid_dims, block_dims) ==
+    survival_function.vars(survival_layer, matrix_size, grid_dims, block_dims) ==
+    population_growth.vars(population_layer, matrix_size, growth_rate, grid_dims, block_dims) ==
     bmsb_stop >= 
     AGStore.file("output.tif")
     )
