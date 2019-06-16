@@ -10,6 +10,8 @@ Installation of PyCUDA and Python packages (can be on any Mesabi node):
 - conda install -c conda-forge fiona
 - conda install -c anaconda scipy
 - conda install -c anaconda coverage
+- conda install -c conda-forge matplotlib
+- conda install -c anaconda pillow
 
 Usage (must be on a k40 node):
 - module load python2
