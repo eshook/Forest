@@ -15,13 +15,37 @@ import pycuda.gpuarray as gpuarray
 import pycuda.curandom as curandom
 from pycuda.tools import DeviceData
 from pycuda.compiler import SourceModule
+import matplotlib.pyplot as plt
+from os import path
+import sys
 
 # Switch Engine to GPU
 Config.engine = cuda_engine
 print("Running Engine",Config.engine)
 
+# Files to use as initial population and survival probabilities
+initial_population_file = '/home/iaa/bures024/Forest/initial_population.tif'
+survival_probabilities_file = '/home/iaa/bures024/Forest/survival_probabilities.tif'
+
+# Make sure files exist
+if (path.isfile(initial_population_file) == False) or (path.isfile(survival_probabilities_file) == False):
+    print('Error. File not found')
+    sys.exit()
+
+# Load initial population and survival layer probabilities
+initial_population = plt.imread(initial_population_file).astype(np.float32)
+survival_probabilities = plt.imread(survival_probabilities_file).astype(np.float32)
+survival_probabilities = np.divide(survival_probabilities,255)
+
+if (initial_population.shape[0] != initial_population.shape[1]) or (survival_probabilities.shape[0] != survival_probabilities.shape[1]):
+    print('Invalid dimensions. Grid must be square (n x n dimensions)')
+    sys.exit()
+if (initial_population.shape[0] != survival_probabilities.shape[0]) or (initial_population.shape[1] != survival_probabilities.shape[1]):
+    print('Invalid entry. Initial population grid and survival probabilities grid must be same shape')
+    sys,exit()
+
 # Constants
-matrix_size = 10                                            # Size of square grid
+matrix_size = initial_population.shape[0]                   # Size of square grid
 block_dims = 4                                              # CUDA block dimensions
 grid_dims = (matrix_size + block_dims - 1) // block_dims    # CUDA grid dimensions
 p_local = 0.50                                              # probability an agent spreads during local diffusion
@@ -266,10 +290,6 @@ non_local = mod.get_function('non_local_diffuse')
 survival_layer = mod.get_function('survival_of_the_fittest')
 population_layer = mod.get_function('population_growth')
 
-# Load initial population and survival layer probabilities
-initial_population = np.loadtxt('/home/iaa/bures024/Forest/initial_population.tif').astype(np.float32)
-survival_probabilities = np.loadtxt('/home/iaa/bures024/Forest/survival_probabilities.tif').astype(np.float32)
-
 # Now run one iteration of the Brown Marmorated Stink Bug (BMSB) Diffusion Simulation
 run_primitive(
     empty_grid.vars(matrix_size) == 
@@ -282,29 +302,4 @@ run_primitive(
     bmsb_stop >= 
     AGStore.file("output.tif")
     )
-
-# other possibilites for opening a .tif file (depending on what the data inside looks like)
-
-'''
-from PIL import Image
-example = Image.open('example.tif')
-example_array = numpy.array(example)
-print('Shape = ', example_array.shape)
-print('Size = ', example_array.size)
-'''
-
-'''
-import gdal
-example = gdal.Open('example.tif')
-example_array = np.array(example.getRasterBand(1).ReadAsArray())
-print('Shape = ', example_array.shape)
-print('Size = ', example_array.size)
-'''
-'''
-import rasterio
-with rasterio.open('example.tif', 'r') as ds:
-    example_array = ds.read()
-print('Shape = ', example_array.shape)
-print('Array = ', example_array)
-'''
 
