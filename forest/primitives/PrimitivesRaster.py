@@ -112,17 +112,18 @@ class Initialize_grid(Primitive):
          # Create grid and convert data to np.float32 (necessary for GPU computation)
          grid = Raster(h=self.size,w=self.size,nrows=self.size,ncols=self.size)
          grid.data = self.initial_population
-         Config.engine.initial_population = grid
          Config.engine.survival_probabilities = self.survival_probabilities
+         Config.engine.generator = self.generator
 
          #return grid 
          Config.engine.stack.push(grid)
 
     # Save the size of the grid parameter
-    def vars(self,size,init_pop,surv_probs):
+    def vars(self,size,init_pop,surv_probs,generator):
          self.size = size
          self.initial_population = init_pop
          self.survival_probabilities = surv_probs
+         self.generator = generator
          return self # Must still return self so there is something to call
 
 initialize_grid = Initialize_grid()
@@ -239,7 +240,7 @@ class Population_growth(Primitive):
         # It will pop off data (GPU'ified array), appliy diff, and push data back onto stack
         @pop2data2gpu
         def diff(gpu_grid_a,gpu_grid_b):
-            self.action(Config.engine.initial_population, gpu_grid_a, gpu_grid_b, self.size, self.rate, time,
+            self.action(gpu_grid_a, gpu_grid_b, self.size, self.rate, time,
                 grid = (self.grid_dims, self.grid_dims), block = (self.block_dims, self.block_dims, 1))
             gpu_grid_a, gpu_grid_b = gpu_grid_b, gpu_grid_a
 

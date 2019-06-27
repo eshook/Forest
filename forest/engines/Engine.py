@@ -602,20 +602,17 @@ class CUDAEngine(Engine):
         super(CUDAEngine,self).__init__("CUDAEngine")
         self.bob_stack = Stack()
         self.queue = Queue()
-        self.generator = curandom.XORWOWRandomNumberGenerator(curandom.seed_getter_unique) # psuedorandom numbers
-        self.continue_cycle = False
+        self.generator = None # psuedorandom number generator
+        self.continue_cycle = False # looping variable
         self.n_iters = 0 # number of iterations to run
         self.iters = 0 # number of iterations already run
-        self.initial_population = None
         self.survival_probabilities = None
         
     def split(self):
 
-        # Move initial population to GPU memory
-        self.initial_population = gpuarray.to_gpu(self.initial_population())
-
         # Move survival_probabilities to CPU memory
-        self.survival_probabilities = gpuarray.to_gpu(self.survival_probabilities)
+        if self.survival_probabilities is not None:
+            self.survival_probabilities = gpuarray.to_gpu(self.survival_probabilities)
 
         # Pop everything off the stack and move from CPU to GPU memory
         # Self.bob_stack contains bobs. Self.stack contains data
@@ -637,11 +634,9 @@ class CUDAEngine(Engine):
     # Merge (>)
     def merge(self):
 
-        # Move initial population to CPU memory
-        self.initial_population = self.initial_population.get()
-
         # Move survival_probabilities to GPU memory
-        self.survival_probabilities = self.survival_probabilities.get()
+        if self.survival_probabilities is not None:
+            self.survival_probabilities = self.survival_probabilities.get()
 
         # Do the same thing as split, but in reverse. 
         # Pop everything off the stack and move from GPU to CPU memory
