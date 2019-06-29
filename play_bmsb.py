@@ -13,9 +13,10 @@ import pycuda.autoinit
 import pycuda.driver as drv
 import pycuda.gpuarray as gpuarray
 import pycuda.curandom as curandom
-from pycuda.tools import DeviceData
 from pycuda.compiler import SourceModule
 from pycuda.characterize import sizeof
+
+# Other imports
 import matplotlib.pyplot as plt
 from os import path
 import sys
@@ -24,16 +25,16 @@ import sys
 Config.engine = cuda_engine
 print("Running Engine",Config.engine)
 
-# Files to use as initial population and survival probabilities
+# .tif files to use as initial population and survival layer probabilities
 initial_population_file = '/home/iaa/bures024/Forest/2000_init_pop.tif'
 survival_probabilities_file = '/home/iaa/bures024/Forest/2000_surv_probs.tif'
 
-# Make sure files exist
+# Make sure both files exist
 if (path.isfile(initial_population_file) == False) or (path.isfile(survival_probabilities_file) == False):
     print('Error. File not found. Exiting program...')
     sys.exit()
 
-# Load initial population and survival layer probabilities
+# Load initial population and survival layer probabilities as numpy arrays
 initial_population = plt.imread(initial_population_file).astype(np.float32)
 survival_probabilities = plt.imread(survival_probabilities_file).astype(np.float32)
 survival_probabilities = np.divide(survival_probabilities,255)
@@ -58,6 +59,7 @@ growth_rate = 0.25                                          # expnential growth 
 mu = 0.0                                                    # location parameter of cauchy distribution
 gamma = 1.0                                                 # scale parameter of cauchy distribution
 n_iters = 1                                                 # number of iterations
+
 kernel_code = """
     #include <curand_kernel.h>
     #include <math.h>
@@ -98,12 +100,13 @@ kernel_code = """
 
     __global__ void init_generators(curandState* global_state, int seed, int grid_size) {
 
-        int x = threadIdx.x + blockIdx.x * blockDim.x;             // column index of cell
-        int y = threadIdx.y + blockIdx.y * blockDim.y;             // row index of cell
+        int x = threadIdx.x + blockIdx.x * blockDim.x;              // column index of cell
+        int y = threadIdx.y + blockIdx.y * blockDim.y;              // row index of cell
 
+        // make sure this cell is within bounds of grid
         if (x < grid_size && y < grid_size) {
 
-            int thread_id = y * grid_size + x;
+            int thread_id = y * grid_size + x;                      // thread index
             curandState local_state;
             curand_init(seed, thread_id, 0, &local_state);
             global_state[thread_id] = local_state;
@@ -112,27 +115,26 @@ kernel_code = """
 
     __global__ void local_diffuse(float* grid_a, float* grid_b, curandState* global_state, int grid_size, float prob, int time) {
 
-        int x = threadIdx.x + blockIdx.x * blockDim.x;             // column element of cell
-        int y = threadIdx.y + blockIdx.y * blockDim.y;             // row element of cell
+        int x = threadIdx.x + blockIdx.x * blockDim.x;              // column index of cell
+        int y = threadIdx.y + blockIdx.y * blockDim.y;              // row index of cell
 
         // make sure this cell is within bounds of grid
         if (x < grid_size && y < grid_size) {
 
-            int thread_id = y * grid_size + x;                     // thread index
-            grid_b[thread_id] = grid_a[thread_id];                 // copy current cell
+            int thread_id = y * grid_size + x;                      // thread index
+            grid_b[thread_id] = grid_a[thread_id];                  // copy current cell
             int edge = (x == 0) || (x == grid_size - 1) || (y == 0) || (y == grid_size - 1);
 
-            // edges are ignored as starting points
+            // ignore cell if its an edge cell
             if (!edge) {
 
                 // ignore cell if it is not already populated
                 if (grid_a[thread_id] > 0.0) {
 
-                    int count = 0;
-                    int n_iters = grid_a[thread_id];
-                    //__syncthreads();
-                    float num;
-                    int neighbor;
+                    int count = 0;                                  // number of agents looked at so far
+                    int n_iters = grid_a[thread_id];                // number of agents in this cell
+                    float num;                                      // random number between (0,1]
+                    int neighbor;           
 
                     // each agent has a chance to spread
                     while (count < n_iters) {
@@ -147,40 +149,40 @@ kernel_code = """
                             
                             grid_b[thread_id] -= 1.0;
                             switch(neighbor) {
-                                case 1:
-                                    grid_b[thread_id - grid_size] += 1.0;           // above
+                                case 1: // above
+                                    grid_b[thread_id - grid_size] += 1.0;
                                     //printf("Cell (%d,%d) spread to cell (%d,%d) at time %d\\n", x, y, x, y - 1, time);
                                     break;
-                                case 2:
-                                    grid_b[thread_id - grid_size - 1] += 1.0;       // above and left
+                                case 2: // above and left
+                                    grid_b[thread_id - grid_size - 1] += 1.0;       
                                     //printf("Cell (%d,%d) spread to cell (%d,%d) at time %d\\n", x, y, x - 1, y - 1, time);
                                     break;
-                                case 3:
-                                    grid_b[thread_id - grid_size + 1] += 1.0;       // above and right
+                                case 3: // above and right
+                                    grid_b[thread_id - grid_size + 1] += 1.0; 
                                     //printf("Cell (%d,%d) spread to cell (%d,%d) at time %d\\n", x, y, x + 1, y - 1, time);
                                     break;
-                                case 4:
-                                    grid_b[thread_id + grid_size] += 1.0;           // below
+                                case 4: // below
+                                    grid_b[thread_id + grid_size] += 1.0;           
                                     //printf("Cell (%d,%d) spread to cell (%d,%d) at time %d\\n", x, y, x, y + 1, time);
                                     break;
-                                case 5:
-                                    grid_b[thread_id + grid_size - 1] += 1.0;       // below and left
+                                case 5: // below and left
+                                    grid_b[thread_id + grid_size - 1] += 1.0;       
                                     //printf("Cell (%d,%d) spread to cell (%d,%d) at time %d\\n", x, y, x - 1, y + 1, time);
                                     break;
-                                case 6:
-                                    grid_b[thread_id + grid_size + 1] += 1.0;       // below and right
+                                case 6: // below and right
+                                    grid_b[thread_id + grid_size + 1] += 1.0;       
                                     //printf("Cell (%d,%d) spread to cell (%d,%d) at time %d\\n", x, y, x + 1, y + 1, time);
                                     break;
-                                case 7:
-                                    grid_b[thread_id - 1] += 1.0;                   // left
+                                case 7: // left
+                                    grid_b[thread_id - 1] += 1.0;                   
                                     //printf("Cell (%d,%d) spread to cell (%d,%d) at time %d\\n", x, y, x - 1, y, time);
                                     break;
-                                case 8:
-                                    grid_b[thread_id + 1] += 1.0;                   // right
+                                case 8: // right
+                                    grid_b[thread_id + 1] += 1.0;                   
                                     //printf("Cell (%d,%d) spread to cell (%d,%d) at time %d\\n", x, y, x + 1, y, time);
                                     break;
-                                default:
-                                    //printf("Invalid number encountered\\n");
+                                default: // should never reach here
+                                    printf("Invalid number encountered\\n");
                                     break;
                             }
                         }
@@ -193,27 +195,26 @@ kernel_code = """
 
     __global__ void non_local_diffuse(float* grid_a, float* grid_b, curandState* global_state, int grid_size, float prob, float mu, float gamma, int time) {
 
-        int x = threadIdx.x + blockIdx.x * blockDim.x;             // column index of cell
-        int y = threadIdx.y + blockIdx.y * blockDim.y;             // row index of cell
+        int x = threadIdx.x + blockIdx.x * blockDim.x;              // column index of cell
+        int y = threadIdx.y + blockIdx.y * blockDim.y;              // row index of cell
  
         // make sure this cell is within bounds of grid
         if (x < grid_size && y < grid_size) {
 
-            int thread_id = y * grid_size + x;                     // thread index
-            grid_b[thread_id] = grid_a[thread_id];                 // copy current cell
+            int thread_id = y * grid_size + x;                      // thread index
+            grid_b[thread_id] = grid_a[thread_id];                  // copy current cell
 
             // ignore cell if it is not already populated
             if (grid_a[thread_id] > 0.0) {
 
-                int count = 0;
-                int n_iters = grid_a[thread_id];
-                //__syncthreads();
-                float num;
-                float radians;
-                float distance;
-                int spread_index;
-                int x_coord;
-                int y_coord;
+                int count = 0;                                      // number of agents looked at so far
+                int n_iters = grid_a[thread_id];                    // number of agents in this cell
+                float num;                                          // random number between (0,1]
+                float radians;                                      // random angle between (0,2*PI)
+                float distance;                                     // distance drawn from cauchy distribution
+                int x_coord;                                        // row index of cell to spread to
+                int y_coord;                                        // column index of cell to spread to
+                int spread_index;                                   // thread index of cell to spread to
 
                 // each agent has a chance to spread
                 while (count < n_iters) {
@@ -246,15 +247,15 @@ kernel_code = """
 
     __global__ void survival_of_the_fittest(float* grid_a, float* grid_b, curandState* global_state, int grid_size, float* survival_probabilities, int time) {
 
-        int x = threadIdx.x + blockIdx.x * blockDim.x;             // column index of cell
-        int y = threadIdx.y + blockIdx.y * blockDim.y;             // row index of cell
+        int x = threadIdx.x + blockIdx.x * blockDim.x;              // column index of cell
+        int y = threadIdx.y + blockIdx.y * blockDim.y;              // row index of cell
 
         // make sure this cell is within bounds of grid
         if (x < grid_size && y < grid_size) {
 
             int thread_id = y * grid_size + x;                      // thread index
             grid_b[thread_id] = grid_a[thread_id];                  // copy current cell
-            float num;
+            float num;                                              // random number between (0,1]
 
             // ignore cell if it is not already populated
             if (grid_a[thread_id] > 0.0) {
@@ -263,7 +264,7 @@ kernel_code = """
 
                 // agents in this cell die
                 if (num < survival_probabilities[thread_id]) {
-                    grid_b[thread_id] = 0.0;                        // cell dies
+                    grid_b[thread_id] = 0.0;
                     //printf("Cell (%d,%d) died at time %d (probability of death was %f)\\n", x, y, time, survival_probabilities[thread_id]);
                 }
             }
@@ -282,7 +283,7 @@ kernel_code = """
             grid_b[thread_id] = grid_a[thread_id];                  // copy current cell
             //printf("Value at (%d,%d) is %f\\n", x, y, grid_b[thread_id]);
 
-            // ignore cell if initial population was 0
+            // ignore cell if population is 0
             if (grid_a[thread_id] > 0.0) {
 
                 // growth formula: x(t) = x(t-1) * (1 + growth_rate)^time
@@ -306,6 +307,7 @@ survival_layer = mod.get_function('survival_of_the_fittest')
 population_layer = mod.get_function('population_growth')
 init_generators = mod.get_function('init_generators')
 
+# Initialize random number generator
 generator = curandom.XORWOWRandomNumberGenerator()
 data_type_size = sizeof(generator.state_type, "#include <curand_kernel.h>")
 generator._state = drv.mem_alloc((matrix_size * matrix_size) * data_type_size)
@@ -313,7 +315,7 @@ seed = 123456789
 init_generators(generator.state, np.int32(seed), np.int32(matrix_size),
     grid = (grid_dims, grid_dims), block = (block_dims, block_dims, 1))
 
-# Now run one iteration of the Brown Marmorated Stink Bug (BMSB) Diffusion Simulation
+# Run n_iters of the Brown Marmorated Stink Bug (BMSB) Diffusion Simulation
 run_primitive(
     empty_grid.vars(matrix_size) == 
     initialize_grid.vars(matrix_size, initial_population, survival_probabilities, generator) ==
