@@ -40,29 +40,28 @@ class TestBmsb(unittest.TestCase):
 		self.assertFalse(Config.engine.continue_cycle)
 		self.assertEqual(Config.engine.n_iters, 0)
 		self.assertEqual(Config.engine.iters, 0)
-		self.assertIsInstance(Config.engine.generator, curandom.XORWOWRandomNumberGenerator)
-		#self.assertIsInstance(Config.engine.stack, ..forest.engines.Engine.Stack)
-		#self.assertIsInstance(Config.engine.bob_stack, ..forest.engines.Engine.Stack)
-		#self.assertIsInstance(Config.engine.queue, ..forest.engines.Engine.Queue)
 
 	def test_initialize_grid(self):
 
-		run_primitive(Initialize_grid().size(MATRIX_SIZE))
+		initial_population = np.zeros((matrix_size,matrix_size)).astype(np.float32)
+		initial_population[matrix_size//2][matrix_size//2] = 1
+		survival_probabilities = np.zeros((matrix_size,matrix_size)).astype(np.float32)
+		run_primitive(Initialize_grid().vars(matrix_size, initial_population, survival_probabilities, None))
 		grid_a = Config.engine.stack.pop().data
-		grid_b = np.zeros((MATRIX_SIZE,MATRIX_SIZE)).astype(np.float32)
-		grid_b[MATRIX_SIZE//2][MATRIX_SIZE//2] = 1
+		grid_b = np.zeros((matrix_size,matrix_size)).astype(np.float32)
+		grid_b[matrix_size//2][matrix_size//2] = 1
 		self.assertTrue((grid_a == grid_b).all())
 
 	def test_empty_grid(self):
 
-		run_primitive(Empty_grid().size(MATRIX_SIZE))
+		run_primitive(Empty_grid().vars(matrix_size))
 		grid_a = Config.engine.stack.pop().data
-		grid_b = np.zeros((MATRIX_SIZE,MATRIX_SIZE)).astype(np.float32)
+		grid_b = np.zeros((matrix_size,matrix_size)).astype(np.float32)
 		self.assertTrue((grid_a == grid_b).all())
 
 	def test_split_single_grid(self):
 		
-		run_primitive(Empty_grid().size(MATRIX_SIZE))
+		run_primitive(Empty_grid().vars(matrix_size))
 		Config.engine.split()
 		grid_gpu = Config.engine.stack.pop()
 		self.assertTrue(Config.engine.is_split)
@@ -70,7 +69,7 @@ class TestBmsb(unittest.TestCase):
 
 	def test_split_multiple_grids(self):
 
-		run_primitive(Empty_grid().size(MATRIX_SIZE) == Empty_grid().size(MATRIX_SIZE))
+		run_primitive(Empty_grid().vars(matrix_size) == Empty_grid().vars(matrix_size))
 		Config.engine.split()
 		self.assertTrue(Config.engine.is_split)
 		while Config.engine.stack.notempty():
@@ -79,7 +78,7 @@ class TestBmsb(unittest.TestCase):
 
 	def test_merge_single_grid(self):
 		
-		grid = Raster(h=MATRIX_SIZE,w=MATRIX_SIZE,nrows=MATRIX_SIZE,ncols=MATRIX_SIZE)
+		grid = Raster(h=matrix_size,w=matrix_size,nrows=matrix_size,ncols=matrix_size)
 		grid.data = grid.data.astype(np.float32)
 		grid_gpu = gpuarray.to_gpu(grid.data)
 		Config.engine.stack.push(grid_gpu)
@@ -92,7 +91,7 @@ class TestBmsb(unittest.TestCase):
 
 		num_grids = 2
 		for i in range(num_grids):
-			grid = Raster(h=MATRIX_SIZE,w=MATRIX_SIZE,nrows=MATRIX_SIZE,ncols=MATRIX_SIZE)
+			grid = Raster(h=matrix_size,w=matrix_size,nrows=matrix_size,ncols=matrix_size)
 			grid.data = grid.data.astype(np.float32)
 			grid_gpu = gpuarray.to_gpu(grid.data)
 			Config.engine.stack.push(grid_gpu)
@@ -104,7 +103,10 @@ class TestBmsb(unittest.TestCase):
 
 	def test_cycle_start(self):
 
-		run_primitive(Empty_grid().size(MATRIX_SIZE) == Initialize_grid().size(MATRIX_SIZE))
+		initial_population = np.zeros((matrix_size,matrix_size)).astype(np.float32)
+		initial_population[matrix_size//2][matrix_size//2] = 1
+		survival_probabilities = np.zeros((matrix_size,matrix_size)).astype(np.float32)
+		run_primitive(Empty_grid().vars(matrix_size) == Initialize_grid().vars(matrix_size, initial_population, survival_probabilities, None))
 		Config.engine.cycle_start()
 
 		self.assertTrue(Config.engine.is_split)
@@ -112,164 +114,230 @@ class TestBmsb(unittest.TestCase):
 
 	def test_cycle_termination(self):
 
-		run_primitive(Empty_grid().size(MATRIX_SIZE) == Initialize_grid().size(MATRIX_SIZE))
-		Config.engine.n_iters = N_ITERS
+		initial_population = np.zeros((matrix_size,matrix_size)).astype(np.float32)
+		initial_population[matrix_size//2][matrix_size//2] = 1
+		survival_probabilities = np.zeros((matrix_size,matrix_size)).astype(np.float32)
+		generator = curandom.XORWOWRandomNumberGenerator()
+		run_primitive(Empty_grid().vars(matrix_size) == Initialize_grid().vars(matrix_size, initial_population, survival_probabilities, generator))
+		Config.engine.n_iters = n_iters
 		Config.engine.cycle_start()
-		run_primitive(Local_diffusion().vars(LOCAL_ALWAYS, GRID_DIMS, BLOCK_DIMS) == Bmsb_stop())
+		run_primitive(Local_diffusion().vars(local_always, matrix_size, p_local_always, grid_dims, block_dims) == Bmsb_stop())
 		Config.engine.cycle_termination()
 
-		self.assertEqual(Config.engine.iters, N_ITERS)
+		self.assertEqual(Config.engine.iters, n_iters)
 		self.assertFalse(Config.engine.is_split)
 		self.assertFalse(Config.engine.continue_cycle)
 
 	def test_bmsb_stop_condition(self):
 
-		run_primitive(Bmsb_stop_condition().vars(N_ITERS))
-		self.assertEqual(Config.engine.n_iters, N_ITERS)
+		run_primitive(Bmsb_stop_condition().vars(n_iters))
+		self.assertEqual(Config.engine.n_iters, n_iters)
 
 	def test_bmsb_stop(self):
 
 		Config.engine.continue_cycle = True
-		for i in range(N_ITERS):
+		for i in range(n_iters):
 			run_primitive(Bmsb_stop())
-		self.assertEqual(Config.engine.iters, N_ITERS)
+		self.assertEqual(Config.engine.iters, n_iters)
 		self.assertFalse(Config.engine.continue_cycle)
 
-	def test_local_diffusion_always(self):
+	def test_local_diffusion_once(self):
 
-		run_primitive(Empty_grid().size(MATRIX_SIZE) == Initialize_grid().size(MATRIX_SIZE))
+		initial_population = np.zeros((matrix_size,matrix_size)).astype(np.float32)
+		initial_population[matrix_size//2][matrix_size//2] = 1
+		survival_probabilities = np.zeros((matrix_size,matrix_size)).astype(np.float32)
+		generator = curandom.XORWOWRandomNumberGenerator()
+		run_primitive(Empty_grid().vars(matrix_size) == Initialize_grid().vars(matrix_size, initial_population, survival_probabilities, generator))
 		Config.engine.split()
-		run_primitive(Local_diffusion().vars(LOCAL_ALWAYS, GRID_DIMS, BLOCK_DIMS))
+		run_primitive(Local_diffusion().vars(local_always, matrix_size, p_local_always, grid_dims, block_dims))
 		grid_a = Config.engine.stack.pop().get()
 		
-		grid_b = np.zeros((MATRIX_SIZE,MATRIX_SIZE)).astype(np.float32)
-		for i in range((MATRIX_SIZE//2)-1,(MATRIX_SIZE//2)+2):
-			for j in range((MATRIX_SIZE//2)-1,(MATRIX_SIZE//2)+2):
-				grid_b[i][j] = 1
+		grid_b = np.zeros((matrix_size,matrix_size)).astype(np.float32)
+		grid_b[(matrix_size//2)+1][matrix_size//2] = 1
 
+
+		print('Local_diffusion_once\nGrid_a = {}\nGrid_b = {}'.format(grid_a, grid_b))
+		self.assertTrue((grid_a == grid_b).all())
+
+	def test_local_diffusion_twice(self):
+
+		initial_population = np.zeros((matrix_size,matrix_size)).astype(np.float32)
+		initial_population[matrix_size//2][matrix_size//2] = 2
+		survival_probabilities = np.zeros((matrix_size,matrix_size)).astype(np.float32)
+		generator = curandom.XORWOWRandomNumberGenerator()
+		run_primitive(Empty_grid().vars(matrix_size) == Initialize_grid().vars(matrix_size, initial_population, survival_probabilities, generator))
+		Config.engine.split()
+		run_primitive(Local_diffusion().vars(local_always, matrix_size, p_local_always, grid_dims, block_dims))
+		grid_a = Config.engine.stack.pop().get()
+		
+		grid_b = np.zeros((matrix_size,matrix_size)).astype(np.float32)
+		grid_b[(matrix_size//2)+1][matrix_size//2] = 2
+
+		print('Local_diffusion_twice\nGrid_a = {}\nGrid_b = {}'.format(grid_a, grid_b))
 		self.assertTrue((grid_a == grid_b).all())
 
 	def test_local_diffusion_never(self):
 
-		run_primitive(Empty_grid().size(MATRIX_SIZE) == Initialize_grid().size(MATRIX_SIZE))
+		initial_population = np.zeros((matrix_size,matrix_size)).astype(np.float32)
+		initial_population[matrix_size//2][matrix_size//2] = 1
+		survival_probabilities = np.zeros((matrix_size,matrix_size)).astype(np.float32)
+		generator = curandom.XORWOWRandomNumberGenerator()
+		run_primitive(Empty_grid().vars(matrix_size) == Initialize_grid().vars(matrix_size, initial_population, survival_probabilities, generator))
 		Config.engine.split()
-		run_primitive(Local_diffusion().vars(LOCAL_NEVER, GRID_DIMS, BLOCK_DIMS))
+		run_primitive(Local_diffusion().vars(local_never, matrix_size, p_local_never, grid_dims, block_dims))
 		grid_a = Config.engine.stack.pop().get()
 
-		grid_b = np.zeros((MATRIX_SIZE,MATRIX_SIZE)).astype(np.float32)
-		grid_b[MATRIX_SIZE//2][MATRIX_SIZE//2] = 1
+		grid_b = np.zeros((matrix_size,matrix_size)).astype(np.float32)
+		grid_b[matrix_size//2][matrix_size//2] = 1
 
+		print('Local_diffusion_never\nGrid_a = {}\nGrid_b = {}'.format(grid_a, grid_b))
 		self.assertTrue((grid_a == grid_b).all())
 
 	def test_local_diffusion_edge(self):
 
-		run_primitive(Empty_grid().size(MATRIX_SIZE) == Empty_grid().size(MATRIX_SIZE))
-		bob = Config.engine.stack.pop()
-		bob.data[0][0] = 1
-		Config.engine.stack.push(bob)
+		initial_population = np.zeros((matrix_size,matrix_size)).astype(np.float32)
+		initial_population[0][0] = 1
+		survival_probabilities = np.zeros((matrix_size,matrix_size)).astype(np.float32)
+		generator = curandom.XORWOWRandomNumberGenerator()
+		run_primitive(Empty_grid().vars(matrix_size) == Initialize_grid().vars(matrix_size, initial_population, survival_probabilities, generator))
 		Config.engine.split()
-		run_primitive(Local_diffusion().vars(LOCAL_ALWAYS, GRID_DIMS, BLOCK_DIMS))
+		run_primitive(Local_diffusion().vars(local_always, matrix_size, p_local_always, grid_dims, block_dims))
 		grid_a = Config.engine.stack.pop().get()
 
-		grid_b = np.zeros((MATRIX_SIZE,MATRIX_SIZE)).astype(np.float32)
+		grid_b = np.zeros((matrix_size,matrix_size)).astype(np.float32)
 		grid_b[0][0] = 1
+
+		print('Local_diffusion_edge\nGrid_a = {}\nGrid_b = {}'.format(grid_a, grid_b))
 		self.assertTrue((grid_a == grid_b).all())
 
 	def test_non_local_diffusion_once(self):
 
-		run_primitive(Empty_grid().size(MATRIX_SIZE) == Initialize_grid().size(MATRIX_SIZE))
+		initial_population = np.zeros((matrix_size,matrix_size)).astype(np.float32)
+		initial_population[matrix_size//2][matrix_size//2] = 1
+		survival_probabilities = np.zeros((matrix_size,matrix_size)).astype(np.float32)
+		generator = curandom.XORWOWRandomNumberGenerator()
+		run_primitive(Empty_grid().vars(matrix_size) == Initialize_grid().vars(matrix_size, initial_population, survival_probabilities, generator))
 		Config.engine.split()
-		run_primitive(Non_local_diffusion().vars(NON_LOCAL_ONCE, GRID_DIMS, BLOCK_DIMS))
+		run_primitive(Non_local_diffusion().vars(non_local_always, matrix_size, p_non_local_always, mu, gamma, grid_dims, block_dims))
 		grid_a = Config.engine.stack.pop().get()
 
-		grid_b = np.zeros((MATRIX_SIZE,MATRIX_SIZE)).astype(np.float32)
-		grid_b[MATRIX_SIZE//2][MATRIX_SIZE//2] = 1
-		grid_b[MATRIX_SIZE-1][MATRIX_SIZE-1] = 1
-		print('Grid_a = ', grid_a)
-		print('Grid_b = ', grid_b)
+		grid_b = np.zeros((matrix_size,matrix_size)).astype(np.float32)
+		grid_b[0][0] = 1
+
+		print('Non_local_diffusion_once\nGrid_a = {}\nGrid_b = {}'.format(grid_a, grid_b))
+		self.assertTrue((grid_a == grid_b).all())
+
+	def test_non_local_diffusion_twice(self):
+
+		initial_population = np.zeros((matrix_size,matrix_size)).astype(np.float32)
+		initial_population[matrix_size//2][matrix_size//2] = 2
+		survival_probabilities = np.zeros((matrix_size,matrix_size)).astype(np.float32)
+		generator = curandom.XORWOWRandomNumberGenerator()
+		run_primitive(Empty_grid().vars(matrix_size) == Initialize_grid().vars(matrix_size, initial_population, survival_probabilities, generator))
+		Config.engine.split()
+		run_primitive(Non_local_diffusion().vars(non_local_always, matrix_size, p_non_local_always, mu, gamma, grid_dims, block_dims))
+		grid_a = Config.engine.stack.pop().get()
+
+		grid_b = np.zeros((matrix_size,matrix_size)).astype(np.float32)
+		grid_b[0][0] = 2
+
+		print('Non_local_diffusion_twice\nGrid_a = {}\nGrid_b = {}'.format(grid_a, grid_b))
 		self.assertTrue((grid_a == grid_b).all())
 
 	def test_non_local_diffusion_never(self):
 		
-		run_primitive(Empty_grid().size(MATRIX_SIZE) == Initialize_grid().size(MATRIX_SIZE))
+		initial_population = np.zeros((matrix_size,matrix_size)).astype(np.float32)
+		initial_population[matrix_size//2][matrix_size//2] = 1
+		survival_probabilities = np.zeros((matrix_size,matrix_size)).astype(np.float32)
+		generator = curandom.XORWOWRandomNumberGenerator()
+		run_primitive(Empty_grid().vars(matrix_size) == Initialize_grid().vars(matrix_size, initial_population, survival_probabilities, generator))
 		Config.engine.split()
-		run_primitive(Non_local_diffusion().vars(NON_LOCAL_NEVER, GRID_DIMS, BLOCK_DIMS))
+		run_primitive(Non_local_diffusion().vars(non_local_never, matrix_size, p_non_local_never, mu, gamma, grid_dims, block_dims))
 		grid_a = Config.engine.stack.pop().get()
 
-		grid_b = np.zeros((MATRIX_SIZE,MATRIX_SIZE)).astype(np.float32)
-		grid_b[MATRIX_SIZE//2][MATRIX_SIZE//2] = 1
-		print('Grid_a = ', grid_a)
-		print('Grid_b = ', grid_b)
+		grid_b = np.zeros((matrix_size,matrix_size)).astype(np.float32)
+		grid_b[matrix_size//2][matrix_size//2] = 1
+
+		print('Non_local_diffusion_never\nGrid_a = {}\nGrid_b = {}'.format(grid_a, grid_b))
 		self.assertTrue((grid_a == grid_b).all())
 
 	def test_survival_kernel_none_survive(self):
 		
 		# make sure all cells die
-		run_primitive(Empty_grid().size(MATRIX_SIZE) == Empty_grid().size(MATRIX_SIZE))
-		bob = Config.engine.stack.pop()
-		for i in range((MATRIX_SIZE//2)-1,(MATRIX_SIZE//2)+2):
-			for j in range((MATRIX_SIZE//2)-1,(MATRIX_SIZE//2)+2):
-				bob.data[i][j] = 1
-		Config.engine.stack.push(bob)
+		initial_population = np.ones((matrix_size,matrix_size)).astype(np.float32)
+		survival_probabilities = np.ones((matrix_size,matrix_size)).astype(np.float32)
+		generator = curandom.XORWOWRandomNumberGenerator()
+		run_primitive(Empty_grid().vars(matrix_size) == Initialize_grid().vars(matrix_size, initial_population, survival_probabilities, generator))
 		Config.engine.split()
-		run_primitive(Survival_of_the_fittest().vars(SURVIVAL_NONE, GRID_DIMS, BLOCK_DIMS))
+		run_primitive(Survival_of_the_fittest().vars(survival_none, matrix_size, grid_dims, block_dims))
 		grid_a = Config.engine.stack.pop().get()
 
-		grid_b = np.zeros((MATRIX_SIZE,MATRIX_SIZE)).astype(np.float32)
+		grid_b = np.zeros((matrix_size,matrix_size)).astype(np.float32)
 		self.assertTrue((grid_a == grid_b).all())
 
-	# Need to figure out how to change P_DEATH in play_bmsb before running test
 	def test_survival_kernel_all_survive(self):
 		
 		# make sure no cells die
-		run_primitive(Empty_grid().size(MATRIX_SIZE) == Empty_grid().size(MATRIX_SIZE))
-		bob = Config.engine.stack.pop()
-		for i in range((MATRIX_SIZE//2)-1,(MATRIX_SIZE//2)+2):
-			for j in range((MATRIX_SIZE//2)-1,(MATRIX_SIZE//2)+2):
-				bob.data[i][j] = 1
-		Config.engine.stack.push(bob)
+		initial_population = np.ones((matrix_size,matrix_size)).astype(np.float32)
+		survival_probabilities = np.zeros((matrix_size,matrix_size)).astype(np.float32)
+		generator = curandom.XORWOWRandomNumberGenerator()
+		run_primitive(Empty_grid().vars(matrix_size) == Initialize_grid().vars(matrix_size, initial_population, survival_probabilities, generator))
 		Config.engine.split()
-		run_primitive(Survival_of_the_fittest().vars(SURVIVAL_ALL, GRID_DIMS, BLOCK_DIMS))
+		run_primitive(Survival_of_the_fittest().vars(survival_all, matrix_size, grid_dims, block_dims))
 		grid_a = Config.engine.stack.pop().get()
 
-		grid_b = np.zeros((MATRIX_SIZE,MATRIX_SIZE)).astype(np.float32)
-		for i in range((MATRIX_SIZE//2)-1,(MATRIX_SIZE//2)+2):
-			for j in range((MATRIX_SIZE//2)-1,(MATRIX_SIZE//2)+2):
-				grid_b[i][j] = 1
+		grid_b = np.ones((matrix_size,matrix_size)).astype(np.float32)
+
+		print('Survival_kernel_all_survive\nGrid_a = {}\nGrid_b = {}'.format(grid_a, grid_b))
 		self.assertTrue((grid_a == grid_b).all())
 
-	# Would be better to figure out how to set the same seed every time
+	def _test_population_growth_(self):
+
+		initial_population = np.zeros((matrix_size,matrix_size)).astype(np.float32)
+		initial_population[matrix_size//2][matrix_size//2] = 1
+		initial_population[0][0] = 1
+		survival_probabilities = np.zeros((matrix_size,matrix_size)).astype(np.float32)
+		generator = curandom.XORWOWRandomNumberGenerator()
+		run_primitive(Empty_grid().vars(matrix_size) == Initialize_grid().vars(matrix_size, initial_population, survival_probabilities, generator))
+		Config.engine.split()
+		run_primitive(Population_growth().vars(population_growth, matrix_size, growth_rate, grid_dims, block_dims))
+		grid_a = Config.engine.stack.pop().get()
+
+		grid_b = np.zeros((matrix_size,matrix_size)).astype(np.float32)
+		grid_b[matrix_size//2][matrix_size//2] = 227
+		grid_b[0][0] = 227
+		self.assertTrue((grid_a == grid_b).all())
+
 	def test_get_random_number(self):
 
-		grid = np.zeros((MATRIX_SIZE,MATRIX_SIZE)).astype(np.float32)
+		generator = curandom.XORWOWRandomNumberGenerator()
+		grid = np.zeros((matrix_size,matrix_size)).astype(np.float32)
 		grid = gpuarray.to_gpu(grid)
-		Config.engine.generator = curandom.XORWOWRandomNumberGenerator(curandom.seed_getter_uniform)
 		for i in range(10):
-			RAND_NUM(Config.engine.generator.state, grid, grid = (GRID_DIMS,GRID_DIMS,1), block = (BLOCK_DIMS,BLOCK_DIMS,1))
+			get_random_number(generator.state, grid, np.int32(matrix_size), grid = (grid_dims,grid_dims), block = (block_dims,block_dims,1))
 			grid_cpu = grid.get()
-			for i in range(MATRIX_SIZE):
-				for j in range(MATRIX_SIZE):
-					self.assertGreaterEqual(grid_cpu[i][j], 0)
-					self.assertLess(grid_cpu[i][j], 1)
+			for i in range(matrix_size):
+				for j in range(matrix_size):
+					self.assertGreater(grid_cpu[i][j], 0)
+					self.assertLessEqual(grid_cpu[i][j], 1)
 
-	# Would be better to figure out how to set the same seed every time
-	def test_get_random_cell(self):
+	def test_get_random_angle_in_radians(self):
 		
-		grid = np.zeros((MATRIX_SIZE,MATRIX_SIZE)).astype(np.float32)
+		generator = curandom.XORWOWRandomNumberGenerator()
+		grid = np.zeros((matrix_size,matrix_size)).astype(np.float32)
 		grid = gpuarray.to_gpu(grid)
-		Config.engine.generator = curandom.XORWOWRandomNumberGenerator(curandom.seed_getter_uniform)
 		for i in range(10):
-			RAND_CELL(Config.engine.generator.state, grid, grid = (GRID_DIMS,GRID_DIMS,1), block = (BLOCK_DIMS,BLOCK_DIMS,1))
+			get_random_angle(generator.state, grid, np.int32(matrix_size), grid = (grid_dims,grid_dims), block = (block_dims,block_dims,1))
 			grid_cpu = grid.get()
-			for i in range(MATRIX_SIZE):
-				for j in range(MATRIX_SIZE):
-					self.assertGreaterEqual(grid_cpu[i][j], 0)
-					self.assertLess(grid_cpu[i][j], MATRIX_SIZE * MATRIX_SIZE)
+			for i in range(matrix_size):
+				for j in range(matrix_size):
+					self.assertGreater(grid_cpu[i][j], 0)
+					self.assertLessEqual(grid_cpu[i][j], 2 * np.pi)
 
 	def test_pop2data2gpu(self):
 
-		grid_a = np.zeros((MATRIX_SIZE,MATRIX_SIZE))
-		grid_b = np.ones((MATRIX_SIZE,MATRIX_SIZE))
+		grid_a = np.zeros((matrix_size,matrix_size))
+		grid_b = np.ones((matrix_size,matrix_size))
 		Config.engine.stack.push(grid_a)
 		Config.engine.stack.push(grid_b)
 
@@ -278,7 +346,7 @@ class TestBmsb(unittest.TestCase):
 			np.add(a,b)
 			return a,b
 
-		grid_c = np.ones((MATRIX_SIZE,MATRIX_SIZE))
+		grid_c = np.ones((matrix_size,matrix_size))
 		self.assertTrue((Config.engine.stack.pop() == grid_c).all())
 
 
