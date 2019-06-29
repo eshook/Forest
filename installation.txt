@@ -17,3 +17,18 @@ Usage (must be on a k40 node):
 - module load python2
 - source activate installs
 - module load cuda/9.0
+
+Writing a kernel function from scratch
+- Define PyCUDA imports
+- Define kernel function
+	- Declared as a python multiline string
+	- Written in C++
+- Compile kernel code and get kernel functions using mod.get_function
+
+Incorporate kernel function with inputs to run a model
+- Define a primitive in PrimitivesRaster.py
+	- vars() accepts inputs to function
+	- __call__() defines functionality of primitive
+- Execute primitive inside run_primitive()
+	- Example: user_primitive.vars(var1, var2, ...)
+	- ==, <=, >=, etc. are used to run multiple primitives
