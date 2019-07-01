@@ -610,7 +610,7 @@ class CUDAEngine(Engine):
         
     def split(self):
 
-        # Move survival_probabilities to CPU memory
+        # Move survival_probabilities to GPU memory
         if self.survival_probabilities is not None:
             self.survival_probabilities = gpuarray.to_gpu(self.survival_probabilities)
 
@@ -634,7 +634,7 @@ class CUDAEngine(Engine):
     # Merge (>)
     def merge(self):
 
-        # Move survival_probabilities to GPU memory
+        # Move survival_probabilities to CPU memory
         if self.survival_probabilities is not None:
             self.survival_probabilities = self.survival_probabilities.get()
 
@@ -687,7 +687,7 @@ class CUDAEngine(Engine):
         # Get the name of the primitive operation being executed
         name = primitive.__class__.__name__
 
-        # Save a copy of each primitive so we can loop
+        # Save a copy of each primitive the first time it runs so we can loop
         if self.continue_cycle == True and self.iters == 0:
             self.queue.enqueue(primitive)
 

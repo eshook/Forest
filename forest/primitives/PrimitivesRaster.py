@@ -109,7 +109,7 @@ class Initialize_grid(Primitive):
          if not self.size:
              self.size = 4 # By default you get a grid of 4x4
 
-         # Create grid and convert data to np.float32 (necessary for GPU computation)
+         # Create grid and set initial population, survival probabilities, and random number generator
          grid = Raster(h=self.size,w=self.size,nrows=self.size,ncols=self.size)
          grid.data = self.initial_population
          Config.engine.survival_probabilities = self.survival_probabilities
@@ -118,7 +118,7 @@ class Initialize_grid(Primitive):
          #return grid 
          Config.engine.stack.push(grid)
 
-    # Save the size of the grid parameter
+    # Save size of the grid, initial population, survival layer probabilities, and random number generator
     def vars(self,size,init_pop,surv_probs,generator):
          self.size = size
          self.initial_population = init_pop
@@ -141,7 +141,7 @@ class Empty_grid(Primitive):
          #return grid 
          Config.engine.stack.push(grid)
 
-    # Save the size of the grid parameter
+    # Save size of the grid parameter
     def vars(self,size):
          self.size = size
          return self # Must still return self so there is something to call
@@ -164,7 +164,7 @@ class Local_diffusion(Primitive):
 
             return gpu_grid_a,gpu_grid_b
 
-    # Save kernel function, matrix size, grid size, and block size
+    # Save kernel function, matrix size, diffusion probability, grid size, and block size
     def vars(self,func,size,prob,grid,block):
         self.action = func
         self.size = np.int32(size)
@@ -191,7 +191,7 @@ class Non_local_diffusion(Primitive):
 
             return gpu_grid_a,gpu_grid_b 
 
-    # Save kernel function, matrix size, grid size, and block size
+    # Save kernel function, matrix size, diffusion probability, mu, gamma, grid size, and block size
     def vars(self,func,size,prob,mu,gamma,grid,block):
         self.action = func
         self.size = np.int32(size)
@@ -246,6 +246,7 @@ class Population_growth(Primitive):
 
             return gpu_grid_a,gpu_grid_b
 
+    # Save kernel function, matrix size, growth rate, grid size, and block size
     def vars(self,func,size,rate,grid,block):
         self.action = func
         self.size = np.int32(size)
@@ -277,54 +278,6 @@ class Bmsb_stop(Primitive):
             Config.engine.continue_cycle = False
 
 bmsb_stop = Bmsb_stop()
-
-# game_of_life_grid
-class Game_of_life_grid(Primitive):
-    def __call__(self):
-        if not self.size:
-            self.size = 4
-
-        # Create grid and convert data to no.float32 (necessary for GPU computation)
-        # Grid data is initially all 0s, but we want each cell to be randomly 0 or 1
-        grid = Raster(h=self.size,w=self.size,nrows=self.size,ncols=self.size)
-        grid.data = np.random.randint(2, size = (self.size, self.size)).astype(np.float32)
-
-        #return grid
-        Config.engine.stack.push(grid)
-
-    # Save the size of the grid parameter
-    def size(self,size):
-        self.size = size
-        return self # Must still return self so there is something to call
-
-game_of_life_grid = Game_of_life_grid()
-
-# game_of_life
-class Game_of_life(Primitive):
-    def __call__(self):
-
-        # This decorator will wrap the pop2data function around diff
-        # It will pop off data (GPU'ified arrays), apply diff, and push data back onto stack
-        @pop2data2gpu
-        def diff(gpu_grid_a, gpu_grid_b):
-            #f = open("results.txt", "a+")
-            #f.write("\n\nGrid before life step: \n{}".format(gpu_grid_a.get()))
-            self.action(gpu_grid_a, gpu_grid_b, 
-                grid = (self.grid_dims, self.grid_dims), block = (self.block_dims, self.block_dims, 1))
-            gpu_grid_a, gpu_grid_b = gpu_grid_b, gpu_grid_a
-            #f.write("\n\nGrid after life step: \n{}".format(gpu_grid_a.get()))
-            #f.close()
-
-            return gpu_grid_a,gpu_grid_b
-
-    # Save kernel function, matrix size, grid size, and block size
-    def vars(self,func,grid,block):
-        self.action = func
-        self.grid_dims = grid
-        self.block_dims = block
-        return self # Must still return self so there is something to call
-
-game_of_life = Game_of_life()
 
 
 # write_grid("output.tif")
