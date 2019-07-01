@@ -147,38 +147,38 @@ kernel_code = """
                             // randomly select a neighbor
                             neighbor = (int) ceilf(get_random_number(global_state, thread_id) * 8.0);
                             
-                            grid_b[thread_id] -= 1.0;
+                            atomicAdd(&grid_b[thread_id], (float)(-1.0));
                             switch(neighbor) {
                                 case 1: // above
-                                    grid_b[thread_id - grid_size] += 1.0;
+                                    atomicAdd(&grid_b[thread_id - grid_size], (float)1.0);
                                     //printf("Cell (%d,%d) spread to cell (%d,%d) at time %d\\n", x, y, x, y - 1, time);
                                     break;
                                 case 2: // above and left
-                                    grid_b[thread_id - grid_size - 1] += 1.0;       
+                                    atomicAdd(&grid_b[thread_id - grid_size - 1], (float)1.0);
                                     //printf("Cell (%d,%d) spread to cell (%d,%d) at time %d\\n", x, y, x - 1, y - 1, time);
                                     break;
                                 case 3: // above and right
-                                    grid_b[thread_id - grid_size + 1] += 1.0; 
+                                    atomicAdd(&grid_b[thread_id - grid_size + 1], (float)1.0);
                                     //printf("Cell (%d,%d) spread to cell (%d,%d) at time %d\\n", x, y, x + 1, y - 1, time);
                                     break;
                                 case 4: // below
-                                    grid_b[thread_id + grid_size] += 1.0;           
+                                    atomicAdd(&grid_b[thread_id + grid_size], (float)1.0);
                                     //printf("Cell (%d,%d) spread to cell (%d,%d) at time %d\\n", x, y, x, y + 1, time);
                                     break;
                                 case 5: // below and left
-                                    grid_b[thread_id + grid_size - 1] += 1.0;       
+                                    atomicAdd(&grid_b[thread_id + grid_size - 1], (float)1.0);
                                     //printf("Cell (%d,%d) spread to cell (%d,%d) at time %d\\n", x, y, x - 1, y + 1, time);
                                     break;
                                 case 6: // below and right
-                                    grid_b[thread_id + grid_size + 1] += 1.0;       
+                                    atomicAdd(&grid_b[thread_id + grid_size + 1], (float)1.0);
                                     //printf("Cell (%d,%d) spread to cell (%d,%d) at time %d\\n", x, y, x + 1, y + 1, time);
                                     break;
                                 case 7: // left
-                                    grid_b[thread_id - 1] += 1.0;                   
+                                    atomicAdd(&grid_b[thread_id - 1], (float)1.0);
                                     //printf("Cell (%d,%d) spread to cell (%d,%d) at time %d\\n", x, y, x - 1, y, time);
                                     break;
                                 case 8: // right
-                                    grid_b[thread_id + 1] += 1.0;                   
+                                    atomicAdd(&grid_b[thread_id + 1], (float)1.0);
                                     //printf("Cell (%d,%d) spread to cell (%d,%d) at time %d\\n", x, y, x + 1, y, time);
                                     break;
                                 default: // should never reach here
@@ -234,8 +234,8 @@ kernel_code = """
                         // make sure chosen cell is in the grid dimensions and is not the current cell
                         if (x_coord < grid_size && x_coord >= 0 && y_coord < grid_size && y_coord >= 0 && (x_coord != x || y_coord != y)) {
                             spread_index = y_coord * grid_size + x_coord;
-                            grid_b[thread_id] -= 1;
-                            grid_b[spread_index] += 1;
+                            atomicAdd(&grid_b[thread_id], (float)(-1.0));
+                            atomicAdd(&grid_b[spread_index], (float)1.0);
                             //printf("Cell (%d,%d) spread to cell (%d,%d) at time %d\\n", x, y, x_coord, y_coord, time);
                         }
                     }
