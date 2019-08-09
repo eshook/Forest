@@ -10,3 +10,4 @@ from .test_Bob import *
 from .test_Bobs import *
 from .test_IO import *
 from .test_PrimitivesRaster import *
+from .test_Bmsb import *

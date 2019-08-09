@@ -46,6 +46,18 @@ class Primitive(object):
         Config.engine.split()
         return right
 
+    def __ge__(self, right):
+        print(self, ">= (Cycle Stop)", right)
+        Config.engine.run(self)
+        Config.engine.cycle_termination()
+        return right
+
+    def __le__(self, right):
+        print(self, "<= (Cycle Start", right)
+        Config.engine.run(self)
+        Config.engine.cycle_start()
+        return right
+
     # This wrap function makes the primitive callable with 2 parameters
     def wrap(self,l,r):
         Config.engine.stack.push(r)
@@ -79,6 +91,15 @@ def pop2data2(func):
     o1.data,o2.data = func(l.data,r.data)
     Config.engine.stack.push(o1)
     Config.engine.stack.push(o2)
+
+# Pop data of 2 bobs off the data stack, apply function (func) to data, 
+# Save output data, then push data back on the stack
+def pop2data2gpu(func):
+    l = Config.engine.stack.pop()
+    r = Config.engine.stack.pop()
+    o1,o2 = func(l,r)
+    Config.engine.stack.push(o2)
+    Config.engine.stack.push(o1)
 
 # This function exposes the engine's run to the outside world.
 def run_primitive(op):
