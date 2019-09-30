@@ -1,24 +1,23 @@
 # ForEST
-ForEST is a domain-specific language that adds parallel spatio-temporal computing to Python.  It is designed FOR Expressing Spatial-Temporal (FOREST) computation using a combination of primitives and patterns.
+ForEST is a domain-specific language FOR Expressing Spatial-Temporal (FOREST) computation. Essentially, for GIScientists ForEST makes it easy to parallelize spatial-temporal computing using Python as the host language. For computational scientists, it makes it easy to test new ways to parallelize spatial and spatial-temporal methods using spatial domain decomposition or functional decomposition. 
 
-## Getting back from the whiteboard
-We took a brief break from developing the ForEST code to work on the theoretical foundations of the language. We are excited to announce that we made some incredible breakthroughs during this period. We now have a solid theoretical model that was inspired by the earlier ForEST work. In the next few months we will start a redesign of ForEST to align with this new theoretical model. In the spirit of reproducible science we will also begin creating a number of examples to demonstrate how the theory operates using the ForEST language itself that anyone can reproduce using Jupyter Notebooks. Stay tuned as we transfer our whiteboard results to back to this public github space.
+## ForEST on the Road
+
+Dr. Eric Shook, lead ForEST designer and developer, just returned from the road. We were finally able to publicly showcase the underlying programming model for ForEST called the Space-Time Key-Collection Programming model. Please see our manuscript entitled ["Space-Time is the Key: For Expressing Spatial-Temporal Computation"](https://auckland.figshare.com/articles/Space-Time_is_the_Key_For_Expressing_Spatial-Temporal_Computing/9870416) published in the *Proceedings for the 15th International Conference on Geocomputation* (see proceedings in the following link: [https://auckland.figshare.com/GeoComputation2019](https://auckland.figshare.com/GeoComputation2019)). We were also honored to be invited to be a plenary speaker for the [New Zealand Geospatial Research Conference 2019](https://geospatial.ac.nz/nzgrc-2019/). Our talk featured ForEST and the US National Science Foundation-supported Hour of CI project and how they are ["Lowering the Barriers to Scalable Geospatial Computation"](https://geospatial.ac.nz/nzgrc-2019-abstracts/#EricShook). This work would not have been possible without the help of many collaborators and students. 
+
+## Whiteboard to publication
+If you have been watching the ForEST page you will see that we had a break in development. First, we paused development to create a theoretical model that was just published called the Space-Time Key-Collection model. We then redesigned ForEST around the model. We have also been working in several private repo's to align ForEST with some of our collaborators codes. Unfortunately, most of this development work is out in the open yet so keep checking back. Please note that we released the GPU/CUDA Engine and demonstration models as part of the invasive species modeling dispersal project.
+
 <pre>
   __________________    
- |                  |   Sorry for the coding break,
- | def forest():    |   but a summer of whiteboarding
- |     awesome=True |   has led to some exciting research.
- |__________________|   We will return to this code shortly.
+ |                  |   Our whiteboarding efforts have finally been published!
+ | def forest():    |   Check out our Geocomputation 2019 paper for highlights.
+ |     awesome=True |   Follow on articles are underway with even more details.
+ |__________________|   
   ==================
  </pre>
 
-## Update: We are back!
-After our summer whiteboard break and a busy semester we are returning to the code.
-We have some exciting news. ForEST is being used for research.
-Two projects are ramping up that will be using ForEST.
-One will be using ForEST to develop a spatial dispersal model of an invasive species in the state of Minnesota, the Brown Marmorated Stink Bug.
-This is a funded project and a postdoc will be working on this ForEST-based model for two years.
-The second will be using ForEST to analyze satellite imagery to identify farm fields.
-This is an exploratory project that will be funded soon hopefully.
-Certainly there will be more to come, but these projects will be some of the first that demonstrate the power of ForEST. 
+## Funded ForEST projects
+Our work using using ForEST to develop a spatial dispersal model of an invasive species in the state of Minnesota, the Brown Marmorated Stink Bug, has been uploaded to the public repo. Much of this work was completed by Tyler Buresh, a talented undergraduate student from the University of Minnesota, under the supervision of Dr. Bryan Runck. We now have a functioning GPU engine using CUDA that supports the foundational Game-of-Life model as well as the spatial dispersal model for the Brown Marmorated Stink Bug.
 
+Our project  using ForEST to analyze satellite imagery to identify farm fields was funded by the Center for Urban and Regional Affairs at the University of Minnesota. Our first ForEST prototype implementation will be uploaded to the public repo in the next few months. We shared a snapshot of our work at the [GeoAI Trillion Pixel Challenge Workshop](https://geoai.ornl.gov/trillion-pixel/) where Dr. Shook was session moderator for the Hardware Design and High-Performance Computing for GeoAI session.
