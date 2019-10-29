@@ -8,9 +8,11 @@ Use of this source code is governed by a BSD-style license that can be found in 
 # TODO: Replace individual variables with numpy arrays
 #       use accessors to get access to individual values
 #       Need to profile to see if this improves overall speedup.
+#       This would align with other projects that use arrays to process x,y,z using vectorization
+#       In particular, I think this could be helpful for using Bobs for indexing (e.g., r-tree, etc.)
 
 # Just Bob
-# (Or for those less cool folks a Bounding OBject :-)
+# (Or for those less cool folks a Spatial-Temporal Bounding OBject :-)
 class Bob(object):
     def __init__(self, y = 0, x = 0, h = 0, w = 0, t = 0, d = 0):
         self.y = y # y-axis (origin)
