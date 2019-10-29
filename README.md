@@ -1,6 +1,13 @@
 # ForEST
 ForEST is a domain-specific language FOR Expressing Spatial-Temporal (FOREST) computation. Essentially, for GIScientists ForEST makes it easy to parallelize spatial-temporal computing using Python as the host language. For computational scientists, it makes it easy to test new ways to parallelize spatial and spatial-temporal methods using spatial domain decomposition or functional decomposition. 
 
+## ForEST in use
+Tyler Buresh, a Computer Science undergraduate student who graduated in Spring 2019, helped develop several key advances in ForEST. We accepted his pull request that has all of his contributions including a CUDA Engine in ForEST to run simulations models on a GPU. He also was the first to test the iterative function in ForEST. He produced two models: Game-of-Life and a species distribution model for the invasive Brown Marmorated Stink Bug.
+
+We are now looking to repeat this for the Minnesota field mapping project. We are in the process of adapting Python codes that have processed statewide satellite imagery to produce a map of all farm fields in the state of Minnesota. The code will be shifted to ForEST syntax to test the ability of ForEST to capture these spatial analytics in an entire workflow. Scalability and performance will also be a key indicator.
+
+Several other projects are in the pipeline, but are not public yet. So stay tuned...
+
 ## ForEST on the Road
 
 Dr. Eric Shook, lead ForEST designer and developer, just returned from the road. We were finally able to publicly showcase the underlying programming model for ForEST called the Space-Time Key-Collection Programming model. Please see our manuscript entitled ["Space-Time is the Key: For Expressing Spatial-Temporal Computation"](https://auckland.figshare.com/articles/Space-Time_is_the_Key_For_Expressing_Spatial-Temporal_Computing/9870416) published in the *Proceedings for the 15th International Conference on Geocomputation* (see proceedings in the following link: [https://auckland.figshare.com/GeoComputation2019](https://auckland.figshare.com/GeoComputation2019)). We were also honored to be invited to be a plenary speaker for the [New Zealand Geospatial Research Conference 2019](https://geospatial.ac.nz/nzgrc-2019/). Our talk featured ForEST and the US National Science Foundation-supported Hour of CI project and how they are ["Lowering the Barriers to Scalable Geospatial Computation"](https://geospatial.ac.nz/nzgrc-2019-abstracts/#EricShook). This work would not have been possible without the help of many collaborators and students. 
