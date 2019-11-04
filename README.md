@@ -1,6 +1,9 @@
 # ForEST
 ForEST is a domain-specific language FOR Expressing Spatial-Temporal (FOREST) computation. Essentially, for GIScientists ForEST makes it easy to parallelize spatial-temporal computing using Python as the host language. For computational scientists, it makes it easy to test new ways to parallelize spatial and spatial-temporal methods using spatial domain decomposition or functional decomposition. 
 
+## ForEST refactoring for growth
+Sorry if things are broken right now. We are refactoring the code in ForEST. To make code commitments from external projects easier (most behind the scenes right now) we are changing some of the file structure and import process in ForEST. Right now the public repository is a bit behind and slightly broken. We are retooling and refactoring the 'core' of ForEST versus the 'add-ons' and extra 'capabilities' for different projects. This will streamline the development process without requiring a growing list of package dependencies. Hopefully we will have this fixed in a week or three, but this will make it much easier for ForEST to grow and interface with other packages such as [PySAL](https://pysal.readthedocs.io/en/latest/) so we can play nice with the rich (open source and commercial) geospatial software ecosystem.
+
 ## ForEST in use
 Tyler Buresh, a Computer Science undergraduate student who graduated in Spring 2019, helped develop several key advances in ForEST. We accepted his pull request that has all of his contributions including a CUDA Engine in ForEST to run simulations models on a GPU. He also was the first to test the iterative function in ForEST. He produced two models: Game-of-Life and a species distribution model for the invasive Brown Marmorated Stink Bug.
 
