@@ -6,6 +6,7 @@ Use of this source code is governed by a BSD-style license that can be found in 
 """
 
 # Import forest code
+from .core import *
 from .bobs import *
 from .engines import *
 from .primitives import *
@@ -22,7 +23,8 @@ cwd = os.getcwd()
 sys.path.append(cwd)
 
 # Add subdirectories in forest
-for subdir in ["bobs","engines","primitives"]:
+# Not including core, because that should automatically be imported
+for subdir in ["bobs","engines","primitives","patterns"]:
     sys.path.append(os.path.join(cwd,subdir))
 
 

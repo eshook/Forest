@@ -14,7 +14,7 @@ import gdal
 import json
 import fiona
 import csv
-from .Primitive import *
+from ..core.Primitive import *
 from ..bobs.Bobs import *
 import numpy as np
 from dateutil.parser import parse

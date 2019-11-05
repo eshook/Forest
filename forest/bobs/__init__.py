@@ -5,5 +5,4 @@ Use of this source code is governed by a BSD-style license that can be found in 
 @contributors: <Contribute and add your name here!>
 """
 
-from .Bob import *
 from .Bobs import *

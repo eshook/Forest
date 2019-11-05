@@ -5,9 +5,8 @@ Use of this source code is governed by a BSD-style license that can be found in 
 @contributors: <Mckenzie Ebert>
 """
 
-from .Pattern import *
-from .IDW import *
+#from .IDW import *
 #from .KDE import * # Temporarily removing KDE
 #from .uniformKDE import * # Temporarily removing uniformKDE
-from .KMeans import *
-from .SpaceTimeKDE import *
+#from .KMeans import *
+#from .SpaceTimeKDE import *

@@ -5,7 +5,23 @@ Use of this source code is governed by a BSD-style license that can be found in 
 @contributors: <Contribute and add your name here!>
 """
 
-from .Primitive import *
-from .Primitives import *
-from .PrimitivesRaster import *
-from .IO import *
+try:
+    from .Primitives import *
+except:
+    pass
+
+try:
+    from .PrimitivesRaster import *
+except:
+    pass
+
+try:
+    from .PrimitivesCUDA import *
+except:
+    pass
+
+try:
+    from .IO import *
+except:
+    pass
+

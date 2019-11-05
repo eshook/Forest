@@ -12,7 +12,7 @@ from collections import defaultdict
 import numpy as np
 import pandas as pd
 
-from .Primitive import *
+from ..core.Primitive import *
 from ..bobs.Bobs import *
 
 '''

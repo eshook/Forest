@@ -4,7 +4,7 @@ Use of this source code is governed by a BSD-style license that can be found in 
 @author: eshook (Eric Shook, eshook@gmail.edu)
 @contributors: <Contribute and add your name here!>
 """
-from ..primitives import *
+from .Primitive import *
 
 class Pattern(Primitive):
     def __init__(self, name):

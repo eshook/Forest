@@ -5,8 +5,8 @@ Use of this source code is governed by a BSD-style license that can be found in 
 @contributors: <Contribute and add your name here!>
 """
 
-from ..engines import Config
-from ..bobs.Bob import *
+from . import Config
+from .Bob import *
 import copy
 
 class Primitive(object):
@@ -94,6 +94,7 @@ def pop2data2(func):
 
 # Pop data of 2 bobs off the data stack, apply function (func) to data, 
 # Save output data, then push data back on the stack
+# FIXME: Need to look at.
 def pop2data2gpu(func):
     l = Config.engine.stack.pop()
     r = Config.engine.stack.pop()

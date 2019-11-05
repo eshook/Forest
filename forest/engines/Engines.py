@@ -6,9 +6,10 @@ Use of this source code is governed by a BSD-style license that can be found in 
 @contributors: <Contribute and add your name here!>
 """
 
-from ..bobs.Bob import *
+from ..core.Engine import *
+from ..core.Bob import *
 from ..bobs.Bobs import *
-from . import Config
+from ..core import Config
 import copy
 import math
 import multiprocessing
@@ -16,120 +17,6 @@ import multiprocessing
 import numpy as np
 import gdal
 
-# PyCUDA imports
-import pycuda.autoinit
-import pycuda.driver as drv
-import pycuda.gpuarray as gpuarray
-import pycuda.curandom as curandom
-from pycuda.tools import DeviceData
-from pycuda.compiler import SourceModule
-
-# This is a generic 'stack' data structure.
-class Stack(object):
-    def __init__(self):
-        self.stack = []
-
-    def push(self,entity):
-        print("PUSH",entity)
-        return self.stack.append(entity)
-        
-    def pop(self):
-        print("POP")
-        return self.stack.pop()
-
-    def notempty(self):
-        return len(self.stack)>0
-
-    def size(self):
-        return len(self.stack)
-
-    def __repr__(self):
-        return "Stack("+str(len(self.stack))+")"
-
-class Queue(object):
-    def __init__(self):
-        self.queue = []
-
-    def enqueue(self,entity):
-        print("ENQUEUE",entity)
-        return self.queue.insert(0,entity)
-
-    def dequeue(self):
-        print("DEQUEUE")
-        return self.queue.pop()
-
-    def notempty(self):
-        return len(self.queue)>0
-
-    def size(self):
-        return len(self.queue)
-
-    def __repr__(self):
-        return "Queue("+str(len(self.queue))+")"
-
-
-class Engine(object):
-    def __init__(self, engine_type):
-        self.engine_type = engine_type # Describes the type of engine
-        self.is_split = False # The data are not split at the beginning
-
-        self.stack = Stack() # Data stack
-
-
-        
-    def __repr___(self):
-        return "Engine "+str(self.engine_type)
-        
-    # Split (<)
-    # Split has two possible consequences:
-    # (1) Modify the data stack by splitting bobs and creating multiple data stacks
-    # (2) Initiate parallelism, which can be applied to one or more of the split data stacks
-    def split(self):
-        pass
-    
-    # Merge (>)
-    # Merge has two possible consequences:
-    # (1) Modify the data stack by merging bobs from multiple data stacks and return to a single data stack
-    # (2) End parallelism
-    def merge(self):
-        pass
-
-    # Sequence (==)
-    def sequence(self):
-        pass
-    
-    # Synchronization (!=)
-    def synchronization(self):
-        pass
-    
-    # Cycle start (<<)
-    def cycle_start(self):
-        pass
-    
-    # Cycle termination (>>)
-    def cycle_termination(self):
-        pass
-
-    # This method will run a single primitive operation
-    def run(self, primitive):
-        print("Running", primitive)
-
-        # Get the name of the primitive operation being executed
-        name = primitive.__class__.__name__
-
-        # Normally we would check is_split, but in the basic case we don't handle it.
-        # So just call the primitive
-        # The primitive will pop bobs off the stack and push outputs back on.
-        primitive()
-
-
-class PassEngine(Engine):
-    def __init__(self):
-        # FIXME: Need an object to describe type of engines rather than a string
-        super(PassEngine,self).__init__("PassEngine")
-    
-# This is the default engine that doesn't do anything.
-pass_engine = PassEngine()    
 
 
 class TileEngine(Engine):
@@ -594,112 +481,6 @@ mp_engine = MultiprocessingEngine()
 
 
 
-# CUDA Engine
-class CUDAEngine(Engine):
-
-    def __init__(self):
-        # FIXME: Need an object to describe type of engines rather than a string
-        super(CUDAEngine,self).__init__("CUDAEngine")
-        self.bob_stack = Stack()
-        self.queue = Queue()
-        self.generator = None # psuedorandom number generator
-        self.continue_cycle = False # looping variable
-        self.n_iters = 0 # number of iterations to run
-        self.iters = 0 # number of iterations already run
-        self.survival_probabilities = None
-        
-    def split(self):
-
-        # Move survival_probabilities to GPU memory
-        if self.survival_probabilities is not None:
-            self.survival_probabilities = gpuarray.to_gpu(self.survival_probabilities)
-
-        # Pop everything off the stack and move from CPU to GPU memory
-        # Self.bob_stack contains bobs. Self.stack contains data
-        temp_stack = Stack()
-        while self.stack.notempty():
-            bob = self.stack.pop()
-            self.bob_stack.push(bob)
-            gpu_bob = gpuarray.to_gpu(bob())
-            temp_stack.push(gpu_bob)
-
-        # Push data back onto stack to maintain order
-        while temp_stack.notempty():
-            gpu_bob = temp_stack.pop()
-            self.stack.push(gpu_bob)
-        
-        # Data is split so set split to be true
-        self.is_split = True
-        
-    # Merge (>)
-    def merge(self):
-
-        # Move survival_probabilities to CPU memory
-        if self.survival_probabilities is not None:
-            self.survival_probabilities = self.survival_probabilities.get()
-
-        # Do the same thing as split, but in reverse. 
-        # Pop everything off the stack and move from GPU to CPU memory
-        temp_stack = Stack()
-        while self.stack.notempty():
-            gpu_bob = self.stack.pop()
-            bob = gpu_bob.get()
-            temp_stack.push(bob)
-
-        # Push data back onto stack to maintain order
-        while temp_stack.notempty():
-            bob = temp_stack.pop()
-            self.stack.push(bob)
-
-        # Now that everything is merged set split to be false
-        self.is_split = False
-
-    # Sequence (==)
-    def sequence(self):
-        pass
-
-    # Cycle Start (<=)
-    def cycle_start(self):
-        # Move from CPU to GPU memory and indicate we will be looping
-        self.split()
-        self.continue_cycle = True
-
-    # Cycle Stop (>=)
-    def cycle_termination(self):
-        # Loop until desired number of iterations is reached
-        while self.continue_cycle == True:
-            copy_queue = Queue()
-            # Pop primitives and run each again
-            while self.queue.notempty():
-                prim = self.queue.dequeue()
-                copy_queue.enqueue(prim)
-                self.run(prim)
-            self.queue = copy_queue
-
-        # Now that were done looping, call merge to move from GPU to CPU memory
-        self.merge()
-
-
-    # This method will run a single primitive operation
-    def run(self, primitive):
-        print("Running", primitive)
-
-        # Get the name of the primitive operation being executed
-        name = primitive.__class__.__name__
-
-        # Save a copy of each primitive the first time it runs so we can loop
-        if self.continue_cycle == True and self.iters == 0:
-            self.queue.enqueue(primitive)
-
-        # Check is_split, if running split then loop over split stacks
-        if self.is_split:
-            # Right now just run the primitive no matter what
-            primitive()
-        else:
-            # otherwise just run the primitive
-            primitive()
-
-cuda_engine = CUDAEngine()
 
 if __name__ == '__main__':
     pass

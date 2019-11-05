@@ -7,7 +7,7 @@ Use of this source code is governed by a BSD-style license that can be found in 
 """
 import numpy as np
 
-from .Bob import *
+from ..core.Bob import *
 
 '''
 # TODO
